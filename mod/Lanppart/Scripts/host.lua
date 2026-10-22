@@ -19,6 +19,11 @@ local MAPS = {
 local injectedFor = nil   -- address of the game mode we already gave a text to
 Host.OnServerReady = nil  -- called once a hosted session has its text and waits for players
 Host.LivesMode = false    -- the current session (hosted or joined) plays with lives
+Host.OnDedicatedServer = false  -- joined a dedicated server (it waits for its organizer to start)
+Host.MoreTextIds = nil    -- server.lua: function giving the text pool (for long texts, below)
+
+local CAPACITY = { [TYPEMODE_BATTLEROYAL] = 40, [TYPEMODE_KNOCKDOWN] = 8, [TYPEMODE_DUEL] = 2 }
+local ROUND_SEPARATOR = "\r\n***\r\n"
 
 -- This game's local player controller, or nil (a dedicated server has none; bots have controllers too).
 local function LocalController()
@@ -158,11 +163,56 @@ function Host.StartFinales()
     return Host.Start(Host.FinalesOptions(saved, Config.FinalesLives))
 end
 
-function Host.Join(address, lives)
+-- dedicated: a Lanppart3 dedicated server (server list, launcher), not a lobby host.
+function Host.Join(address, lives, dedicated)
     Host.LivesMode = lives and true or false
+    Host.OnDedicatedServer = dedicated and true or false
     Native.EnableIris()
     print("[Lanppart] joining " .. address .. "\n")
     Console("open " .. address)
+end
+
+local function RoundsOf(body)
+    local n = 1
+    for line in (body .. "\n"):gmatch("([^\n]*)\n") do
+        if line:gsub("\r", ""):match("^%s*%*%*%*%s*$") then n = n + 1 end
+    end
+    return n
+end
+
+-- K.O. and Duel end when the text runs out, and the game then executes everyone behind the leader. With
+-- lives, the lives must decide instead: the text gets enough rounds for the worst case (each round costs
+-- at least one life, the winner can lose all but one): writers x lives rounds, taken from other texts of
+-- the pool (repeated if there are too few).
+local function LongEnough(text, lang, opts)
+    local mode = opts.TypeMode
+    if not Host.LivesMode or (mode ~= TYPEMODE_KNOCKDOWN and mode ~= TYPEMODE_DUEL) then return text end
+    local needed = (CAPACITY[mode] or 2) * math.max(1, opts.BulletSlotsNum)
+    local rounds = RoundsOf(text.Text)
+    if rounds >= needed then return text end
+    local candidates = {}
+    local pool = Host.MoreTextIds and Host.MoreTextIds() or select(2, Texts.SavedSelection(mode))
+    for _, id in ipairs(pool or {}) do
+        if id ~= text.Id then candidates[#candidates + 1] = id end
+    end
+    for i = #candidates, 2, -1 do
+        local j = math.random(i)
+        candidates[i], candidates[j] = candidates[j], candidates[i]
+    end
+    candidates[#candidates + 1] = text.Id  -- the session's own text last, when the pool is used up
+    local body, added, i = text.Text, 0, 0
+    while rounds < needed and added < 200 do
+        i = i % #candidates + 1
+        local more = Texts.Get(lang, candidates[i])
+        if more then
+            body = body:gsub("%s+$", "") .. ROUND_SEPARATOR .. more.Text:gsub("^%s+", "")
+            rounds = RoundsOf(body)
+        end
+        added = added + 1
+    end
+    print(string.format("[Lanppart] text %d lengthened to %d rounds (lives: %d writers x %d lives)\n", text.Id,
+        rounds, CAPACITY[mode] or 2, opts.BulletSlotsNum))
+    return { Text = body, Id = text.Id, Difficulty = text.Difficulty }
 end
 
 -- The game mode asks the backend for the text, which the client build never does: provide it.
@@ -184,6 +234,7 @@ local function ProvideText(gm, gs)
         print("[Lanppart] could not find text " .. tostring(id) .. " (" .. lang .. ")\n")
         return
     end
+    text = LongEnough(text, lang, opts)
     injectedFor = key
     gm:OnGetRandomText({ bSuccessful = true, ErrCode = 200, ErrMsg = "" },
         { Text = text.Text, text_id = text.Id, text_difficulty = text.Difficulty })

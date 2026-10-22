@@ -36,16 +36,42 @@ function Hearts.NewRow(widgetTree, size)
     return row
 end
 
--- Shows lives / total hearts in the row (only when they changed).
+-- A heart being lost: it swells, then shrinks and fades into an empty heart (~0.6 s).
+local LOSS_FRAMES = { { 1.35, 1.0 }, { 1.7, 1.0 }, { 1.55, 0.9 }, { 1.2, 0.75 }, { 0.85, 0.6 }, { 0.6, 0.45 } }
+
+local function AnimateLoss(img, empty)
+    local frame = 0
+    LoopAsync(70, function()
+        frame = frame + 1
+        local done = frame > #LOSS_FRAMES
+        local f = LOSS_FRAMES[frame]
+        ExecuteInGameThread(function()
+            if not Valid(img) then return end
+            if done then
+                img:SetBrushFromTexture(empty, false)
+                img:SetRenderScale({ X = 1.0, Y = 1.0 })
+                img:SetRenderOpacity(1.0)
+            else
+                img:SetRenderScale({ X = f[1], Y = f[1] })
+                img:SetRenderOpacity(f[2])
+            end
+        end)
+        return done
+    end)
+end
+
+-- Shows lives / total hearts in the row (only when they changed). A heart just lost is animated.
+-- Returns the number of hearts lost since the previous call.
 function Hearts.Set(row, lives, total)
-    if not Valid(row) then return end
+    if not Valid(row) then return 0 end
     local state = rows[row:GetAddress()]
-    if not state then return end
+    if not state then return 0 end
     total = math.max(0, math.floor(total))
     lives = math.max(0, math.min(total, math.floor(lives)))
-    if state.Lives == lives and state.Total == total then return end
+    if state.Lives == lives and state.Total == total then return 0 end
+    local lost = (state.Total == total and state.Lives and state.Lives > lives) and state.Lives - lives or 0
     local full, empty = Texture("heart_full", row), Texture("heart_empty", row)
-    if not (full and empty) then return end
+    if not (full and empty) then return 0 end
     while #state.Images < total do
         local img = StaticConstructObject(StaticFindObject("/Script/UMG.Image"), state.Tree)
         local slot = row:AddChildToHorizontalBox(img)
@@ -56,7 +82,11 @@ function Hearts.Set(row, lives, total)
     local width = state.Size * 13 / 12  -- heart_*.png are 13 x 12 pixel art
     for i, img in ipairs(state.Images) do
         if i <= total then
-            img:SetBrushFromTexture(i <= lives and full or empty, false)
+            if lost > 0 and i > lives and i <= state.Lives then
+                AnimateLoss(img, empty)  -- (still full: it empties at the end)
+            else
+                img:SetBrushFromTexture(i <= lives and full or empty, false)
+            end
             img:SetDesiredSizeOverride({ X = width, Y = state.Size })
             img:SetVisibility(VIS_VISIBLE)
         else
@@ -64,6 +94,19 @@ function Hearts.Set(row, lives, total)
         end
     end
     state.Lives, state.Total = lives, total
+    return lost
+end
+
+local LOSS_SOUND = "/Game/TheEnd/audio/sounds/pawn/gun/cue_pawn_gun_trigger_missed.cue_pawn_gun_trigger_missed"
+
+function Hearts.PlayLossSound(context)
+    local sound = StaticFindObject(LOSS_SOUND)
+    if not Valid(sound) then
+        local ok, loaded = pcall(LoadAsset, LOSS_SOUND)
+        sound = ok and loaded or nil
+    end
+    if not Valid(sound) then return end
+    StaticFindObject("/Script/Engine.Default__GameplayStatics"):PlaySound2D(context, sound, 1.0, 1.0, 0.0, nil, nil, true)
 end
 
 function Hearts.Show(row, shown)

@@ -58,6 +58,7 @@ local function OnGameThreadTick()
         Native.DisableIris()
         Native.SetLives(false)
         Host.LivesMode = false
+        Host.OnDedicatedServer = false
     end
     lastGiState = gi.State
     -- The launcher's text list, once the texts are loaded (servers: see Server.Tick).
@@ -70,7 +71,7 @@ local function OnGameThreadTick()
     -- Server picked in the launcher's server list: join it once in the main menu.
     if not joinDone and gi.State == GI_STATE_MAINMENU then
         joinDone = true
-        Host.Join(launchOrders.join, launchOrders.lives == "1")
+        Host.Join(launchOrders.join, launchOrders.lives == "1", true)
     end
     Menu.Tick()
     Browser.Tick()

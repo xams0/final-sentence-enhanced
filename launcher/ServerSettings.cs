@@ -36,6 +36,22 @@ namespace Lanppart3Launcher
         [DataMember] public int MaxMistakesPerRound = 3;
         [DataMember] public int RoundDuration = 120;
         [DataMember] public int PauseDuration = 10;
+        // A lobby preset (PresetStore) whose rules the server plays, or -1 for the rules above.
+        [DataMember] public int Preset = -1;
+
+        // The rules the server plays: its own, or its preset's (kept up to date with the preset).
+        public ServerSettings Effective()
+        {
+            if (Preset < 0 || Preset >= PresetStore.Count) return this;
+            var p = PresetStore.Load(Preset);
+            var s = Clone();
+            s.Mode = p.Mode; s.Roulette = p.Roulette; s.Lives = p.Lives; s.BulletSlots = p.BulletSlots;
+            s.InitialBullets = p.InitialBullets; s.MaxMistakesPerRound = p.MaxMistakesPerRound;
+            s.FillWithBots = p.FillWithBots; s.Bots = p.Bots; s.BotsDifficulty = p.BotsDifficulty;
+            s.MistakeBehaviour = p.MistakeBehaviour; s.CapitalsMatter = p.CapitalsMatter;
+            s.RoundDuration = p.RoundDuration; s.PauseDuration = p.PauseDuration;
+            return s;
+        }
 
         public static int Capacity(GameMode mode) => mode == GameMode.BattleRoyale ? 40 : mode == GameMode.Knockdown ? 8 : 2;
 

@@ -6,6 +6,7 @@
 local Presets = {}
 
 local TYPEMODE_BATTLEROYAL = 0
+local TYPEMODE_KNOCKDOWN = 1
 local TYPEMODE_DUEL = 2
 local MARKER_BASE = -1000
 local LEGACY_MARKER = -2  -- V1/V2 lobbies: Lanppart Poules / Finales without bots
@@ -14,7 +15,8 @@ local DEFAULTS = {
     { Key = "poules", Name = "Lanppart Poules", Mode = TYPEMODE_BATTLEROYAL, Roulette = false, Lives = 3,
       BulletSlots = 6, InitialBullets = 1, MaxMistakesPerRound = 3, Bots = 0, BotsDifficulty = 2,
       MistakeBehaviour = 1, CapitalsMatter = false, RoundDuration = 240, PauseDuration = 10 },
-    { Key = "finales", Name = "Lanppart Finales", Mode = TYPEMODE_DUEL, Roulette = false, Lives = 3,
+    -- Up to 8 players: the last of each paragraph loses a life, only the last life kills.
+    { Key = "finales", Name = "Lanppart Finales", Mode = TYPEMODE_KNOCKDOWN, Roulette = false, Lives = 3,
       BulletSlots = 6, InitialBullets = 1, MaxMistakesPerRound = 3, Bots = 0, BotsDifficulty = 2,
       MistakeBehaviour = 1, CapitalsMatter = false, RoundDuration = 120, PauseDuration = 10 },
 }

@@ -48,18 +48,26 @@ local function LoadSettings()
     return true
 end
 
+-- The configured texts (ids).
+local function Pool()
+    local pool = {}
+    for _, id in ipairs(settings.TextIds or {}) do pool[#pool + 1] = id end
+    for _, t in ipairs(settings.Texts or {}) do
+        if settings.TextIds == nil or #settings.TextIds == 0 or settings.UseCustomTexts then pool[#pool + 1] = t.Id end
+    end
+    if #pool == 0 then
+        local _, saved = Texts.SavedSelection(settings.Mode)
+        pool = saved
+    end
+    return pool
+end
+-- Long texts for lives (host.lua); a lobby host (no server settings) uses its saved selection.
+Host.MoreTextIds = function() return settings and Pool() or nil end
+
 -- Next text id: the configured pool in a random order, without repeating a text before all were played.
 local function NextTextId()
     if #textQueue == 0 then
-        local pool = {}
-        for _, id in ipairs(settings.TextIds or {}) do pool[#pool + 1] = id end
-        for _, t in ipairs(settings.Texts or {}) do
-            if settings.TextIds == nil or #settings.TextIds == 0 or settings.UseCustomTexts then pool[#pool + 1] = t.Id end
-        end
-        if #pool == 0 then
-            local _, saved = Texts.SavedSelection(settings.Mode)
-            pool = saved
-        end
+        local pool = Pool()
         for i = #pool, 2, -1 do
             local j = math.random(i)
             pool[i], pool[j] = pool[j], pool[i]

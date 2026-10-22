@@ -136,8 +136,17 @@ namespace Lanppart3Launcher
             port.ValueChanged += v => { s.Port = v; SaveSettings(server); };
 
             o.Section("Partie");
-            var mode = o.Row("Mode de jeu", OptionsBuilder.Combo(ModeNames, (int)s.Mode));
-            mode.SelectionChanged += (x, e) => { s.Mode = (GameMode)mode.SelectedIndex; SaveSettings(server); rebuild(); };
+            // The game's modes, then the lobby presets (their rules, kept up to date with the presets page).
+            var modes = ModeNames.Concat(Enumerable.Range(0, PresetStore.Count).Select(i => PresetStore.Load(i).Name)).ToList();
+            var mode = o.Row("Mode de jeu", OptionsBuilder.Combo(modes, s.Preset >= 0 ? ModeNames.Length + s.Preset : (int)s.Mode));
+            mode.SelectionChanged += (x, e) =>
+            {
+                if (mode.SelectedIndex >= ModeNames.Length) s.Preset = mode.SelectedIndex - ModeNames.Length;
+                else { s.Preset = -1; s.Mode = (GameMode)mode.SelectedIndex; }
+                SaveSettings(server);
+                rebuild();
+            };
+            var rules = s.Effective();
 
             o.Section("Textes");
             var langs = Languages();
@@ -145,7 +154,7 @@ namespace Lanppart3Launcher
             lang.SelectionChanged += (x, e) => { s.Language = (string)lang.SelectedItem; SaveSettings(server); rebuild(); };
             var source = o.Row("Sélection des textes", OptionsBuilder.Combo(TextSources, (int)s.Texts));
             source.SelectionChanged += (x, e) => { s.Texts = (TextSource)source.SelectedIndex; SaveSettings(server); rebuild(); };
-            var catalog = TextLibrary.LoadCatalog().Where(t => t.Language == s.Language && t.Fits(s.Mode)).ToList();
+            var catalog = TextLibrary.LoadCatalog().Where(t => t.Language == s.Language && t.Fits(rules.Mode)).ToList();
             var custom = TextLibrary.LoadCustom().Where(t => t.Language == s.Language).ToList();
             if (s.Texts == TextSource.Selection) form.Children.Add(TextPicker(server, catalog, custom));
             int pool = s.Texts == TextSource.GameTexts ? catalog.Count : s.Texts == TextSource.CustomTexts ? custom.Count :
@@ -154,7 +163,20 @@ namespace Lanppart3Launcher
                    (catalog.Count == 0 && s.Texts != TextSource.CustomTexts
                        ? " La liste des textes du jeu apparaît après un premier lancement en mode Lanppart3 ou d'un serveur." : ""));
 
-            BuildRules(o, s, () => SaveSettings(server), rebuild);
+            if (s.Preset < 0)
+            {
+                BuildRules(o, s, () => SaveSettings(server), rebuild);
+                return;
+            }
+            o.Section("Règles");
+            o.Note("Règles du preset « " + PresetStore.Load(s.Preset).Name + " » : " +
+                   ModeNames[(int)rules.Mode] + ", " + (rules.Roulette ? "roulette" : rules.Lives + " vies") + ", bots : " +
+                   (rules.FillWithBots ? "compléter les places" : rules.Bots.ToString()) + ". Elles se modifient dans « Presets Lanppart ».");
+            int preset = s.Preset;
+            var edit = Action("Modifier ce preset", (x, e) => { selectedPreset = preset; ShowPresetsPage(); });
+            edit.HorizontalAlignment = HorizontalAlignment.Left;
+            edit.Margin = new Thickness(18, 6, 0, 0);
+            form.Children.Add(edit);
         }
 
         // Bots, mistakes, roulette or lives, durations: the rules of a server or of a lobby preset.
@@ -259,15 +281,17 @@ namespace Lanppart3Launcher
         void RefreshServerSide(StackPanel side, ServerInstance server)
         {
             var s = server.Settings;
+            var rules = s.Effective();
             var key = string.Join("|", server.Running, server.Phase, server.PlayerCount, string.Join(",", server.Players), s.Name,
-                                  s.Mode, s.Roulette, s.Lives, s.Port, ModReady);
+                                  rules.Mode, rules.Roulette, rules.Lives, s.Port, s.Preset, ModReady);
             if (Equals(side.Tag, key)) return;  // unchanged: keep the buttons as they are (hover, clicks)
             side.Tag = key;
             side.Children.Clear();
             side.Children.Add(Label(s.Name, 22, "Cream"));
             side.Children.Add(Label(server.PhaseText, 17, server.Running ? "CheckGreen" : "Muted", new Thickness(0, 4, 0, 0)));
-            int capacity = ServerSettings.Capacity(s.Mode);
-            side.Children.Add(Label(ModeNames[(int)s.Mode] + " · " + (s.Roulette ? "roulette" : s.Lives + " vies"), 15, "OptionLabel",
+            int capacity = ServerSettings.Capacity(rules.Mode);
+            side.Children.Add(Label((s.Preset >= 0 ? PresetStore.Load(s.Preset).Name + " · " : "") + ModeNames[(int)rules.Mode] +
+                                    " · " + (rules.Roulette ? "roulette" : rules.Lives + " vies"), 15, "OptionLabel",
                                     new Thickness(0, 4, 0, 10)));
             if (server.Running)
             {

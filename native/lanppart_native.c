@@ -377,6 +377,7 @@ typedef double (*GetServerTime_t)(void* gs);
 #define TYPEMODE_Knockdown         1
 #define ROLE_Authority 3
 #define WS_Typing   2
+#define WS_Await    4
 #define WS_Roulette 6
 #define WS_Dead     8
 #define RESULT_RoundTimeout          2
@@ -434,10 +435,51 @@ static void SkipRound(uint8_t* gs, uint8_t* ps) {
 }
 
 // Lets the writer go on typing the current round, as the game does after a Battle Royale roulette.
-static void ContinueRound(uint8_t* ps) {
+// A remote writer's game blocked its keyboard when it reached the mistakes limit, and only unblocks it on
+// a replicated writer state change: Typing right away would not replicate (no change), so the writer
+// waits (Await) for a moment and lanppart_server_tick puts them back to Typing.
+#define CONTINUE_DELAY 0.8
+#define MAX_PENDING_CONTINUES 64
+static struct { uint8_t* gs; uint8_t* ps; double due; } g_continues[MAX_PENDING_CONTINUES];
+static int g_continueCount;
+
+static double ServerTime(uint8_t* gs) {
+    return ((GetServerTime_t)(*(void***)gs)[VT_GS_GETSERVERTIME / 8])(gs);
+}
+
+static void ContinueRound(uint8_t* gs, uint8_t* ps) {
     ((PsVoid_t)AT(RVA_RESET_ROUND_MISTAKES))(ps);
-    ((SetWriterState_t)AT(RVA_SET_WRITER_STATE))(ps, WS_Typing);
+    ((SetWriterState_t)AT(RVA_SET_WRITER_STATE))(ps, WS_Await);
     ForceNetUpdate(ps);
+    if (g_continueCount < MAX_PENDING_CONTINUES) {
+        g_continues[g_continueCount].gs = gs;
+        g_continues[g_continueCount].ps = ps;
+        g_continues[g_continueCount].due = ServerTime(gs) + CONTINUE_DELAY;
+        g_continueCount++;
+    } else {
+        ((SetWriterState_t)AT(RVA_SET_WRITER_STATE))(ps, WS_Typing);
+    }
+}
+
+static int HasPlayer(uint8_t* gs, uint8_t* ps) {
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    for (int32_t i = 0; i < players->Num; i++)
+        if (((uint8_t**)players->Data)[i] == ps) return 1;
+    return 0;
+}
+
+static void ResumeWriters(uint8_t* gs) {
+    double now = ServerTime(gs);
+    for (int i = 0; i < g_continueCount; ) {
+        if (g_continues[i].gs != gs) { i++; continue; }
+        uint8_t* ps = g_continues[i].ps;
+        if (now < g_continues[i].due) { i++; continue; }
+        if (HasPlayer(gs, ps) && ps[OFF_PS_WRITERSTATE] == WS_Await) {
+            ((SetWriterState_t)AT(RVA_SET_WRITER_STATE))(ps, WS_Typing);
+            ForceNetUpdate(ps);
+        }
+        g_continues[i] = g_continues[--g_continueCount];
+    }
 }
 
 // Costs the writer a life; executes them (with deathResult) when it was their last one.
@@ -461,7 +503,7 @@ static void LoseLife(uint8_t* gs, uint8_t* ps, float delay, uint8_t deathResult,
         return;
     }
     if (skipRound) SkipRound(gs, ps);
-    else ContinueRound(ps);
+    else ContinueRound(gs, ps);
 }
 
 static void Execute(uint8_t* gs, uint8_t* ps, float delay, uint8_t result) {
@@ -1054,7 +1096,9 @@ __declspec(dllexport) int lanppart_server_tick(void* L) {
         // Only our hosted sessions have a net driver without a server connection.
         if (!driver || *(void**)(driver + OFF_NETDRIVER_SERVERCONNECTION)) continue;
         uint8_t* gs = *(uint8_t**)(world + OFF_WORLD_GAMESTATE);
-        if (gs) ResolveKnockdownRoulettes(gs);
+        if (!gs) continue;
+        ResolveKnockdownRoulettes(gs);
+        ResumeWriters(gs);
     }
     return 0;
 }

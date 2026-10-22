@@ -25,7 +25,8 @@ namespace Lanppart3Launcher
             }
             : new ServerSettings
             {
-                Name = "Lanppart Finales", Mode = GameMode.Duel, Roulette = false, Lives = 3, BulletSlots = 6,
+                // Up to 8 players: the last of each paragraph loses a life, only the last life kills.
+                Name = "Lanppart Finales", Mode = GameMode.Knockdown, Roulette = false, Lives = 3, BulletSlots = 6,
                 InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
                 MistakeBehaviour = 1, RoundDuration = 120, PauseDuration = 10,
             };

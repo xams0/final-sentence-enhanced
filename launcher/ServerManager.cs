@@ -134,7 +134,7 @@ namespace Lanppart3Launcher
         // Session file for the server: the chosen texts (the catalog's game texts, the custom texts).
         public void WriteSession(ServerInstance server)
         {
-            var s = server.Settings;
+            var s = server.Settings.Effective();
             var custom = new List<CustomText>();
             var ids = new List<int>();
             if (s.Texts == TextSource.CustomTexts || s.Texts == TextSource.Both)
@@ -147,7 +147,7 @@ namespace Lanppart3Launcher
                 custom.AddRange(TextLibrary.LoadCustom().Where(t => s.SelectedCustomTexts.Contains(t.File)));
             }
             Directory.CreateDirectory(server.Dir);
-            s.Save(server.SettingsPath);
+            server.Settings.Save(server.SettingsPath);
             File.WriteAllText(Path.Combine(server.Dir, "session.lua"), s.ToLua(custom, ids.Distinct()), new UTF8Encoding(false));
         }
 

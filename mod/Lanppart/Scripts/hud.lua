@@ -72,9 +72,10 @@ local function SetUpHud(hud, duel)
     end
 end
 
+-- Returns the hearts just lost.
 local function DuelName(textBlock, hearts, ps)
     SetText(textBlock, ps.PlayerNamePrivate:ToString() .. " -")
-    Hearts.Set(hearts, Hearts.LivesOf(ps))
+    return Hearts.Set(hearts, Hearts.LivesOf(ps))
 end
 
 -- Scoreboard and match results: the bullets cell of each row shows hearts instead.
@@ -111,10 +112,42 @@ local function HookBullets()
     end)
 end
 
+-- On a dedicated server, the players wait in the room until the organizer clicks "Lancer la partie".
+local SESSION_WAITING_FOR_PLAYERS = 2
+local WAITING_TEXT = "En attente du lancement de la partie par l'organisateur..."
+local waitLabel = nil
+
+local function ShowWaiting(gs)
+    local waiting = Host.OnDedicatedServer and Valid(gs) and gs.SessionState == SESSION_WAITING_FOR_PLAYERS
+    local hud = FindFirstOf("wbp_hud_persistent_C")
+    if not Valid(hud) then return end
+    if not (Valid(waitLabel) and waitLabel:GetOuter():GetOuter():GetAddress() == hud:GetAddress()) then
+        if not waiting then return end
+        local root = hud.WidgetTree.RootWidget
+        if not (Valid(root) and root:IsA("/Script/UMG.CanvasPanel")) then return end
+        waitLabel = StaticConstructObject(StaticFindObject("/Script/UMG.TextBlock"), hud.WidgetTree, FName("LanppartWaitLabel"))
+        waitLabel:SetText(FText(WAITING_TEXT))
+        waitLabel:SetFont(hud.PingValue.Font)
+        local font = waitLabel.Font
+        font.Size = 30
+        waitLabel:SetFont(font)
+        waitLabel:SetColorAndOpacity({ SpecifiedColor = { R = 0.95, G = 0.86, B = 0.66, A = 1.0 }, ColorUseRule = 0 })
+        waitLabel:SetShadowOffset({ X = 2, Y = 2 })
+        waitLabel:SetShadowColorAndOpacity({ R = 0, G = 0, B = 0, A = 0.9 })
+        local slot = root:AddChildToCanvas(waitLabel)
+        slot:SetAnchors({ Minimum = { X = 0.5, Y = 0.2 }, Maximum = { X = 0.5, Y = 0.2 } })
+        slot:SetAlignment({ X = 0.5, Y = 0.5 })
+        slot:SetAutoSize(true)
+    end
+    local wanted = waiting and 4 or 1  -- HitTestInvisible / Collapsed
+    if waitLabel:GetVisibility() ~= wanted then waitLabel:SetVisibility(wanted) end
+end
+
 -- Called periodically on the game thread.
 function Hud.Tick()
     ShowModLabel()
     HookBullets()
+    ShowWaiting(FindFirstOf("PGGameplayGameState"))
     if not Host.LivesMode then return end
     local gs = FindFirstOf("PGGameplayGameState")
     if not Valid(gs) then return end
@@ -125,14 +158,16 @@ function Hud.Tick()
     -- The revolver drums would show the lost lives as loaded chambers.
     Hide(hud.CylinderAssembly)
     Hide(hud.CylinderAssemblyRight)
+    local lost
     if duel then
-        DuelName(hud.DuelPlayerName_Left, duelLeft, hud.PlayerState)
+        lost = DuelName(hud.DuelPlayerName_Left, duelLeft, hud.PlayerState)
         if Valid(hud.DuelOpponentPlayerState) then
             DuelName(hud.DuelPlayerName_Right, duelRight, hud.DuelOpponentPlayerState)
         end
     else
-        Hearts.Set(ownRow, Hearts.LivesOf(hud.PlayerState))
+        lost = Hearts.Set(ownRow, Hearts.LivesOf(hud.PlayerState))
     end
+    if lost > 0 then Hearts.PlayLossSound(hud) end  -- (own lives only)
 end
 
 return Hud

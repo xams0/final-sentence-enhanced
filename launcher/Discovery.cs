@@ -40,7 +40,7 @@ namespace Lanppart3Launcher
 
         public static byte[] Beacon(ServerInstance s)
         {
-            var st = s.Settings;
+            var st = s.Settings.Effective();
             var name = (st.Name ?? "").Replace("|", "/");
             var uid = (Environment.MachineName + "/" + s.Id).Replace("|", "/");
             var msg = string.Join("|", Magic, "1", uid, st.Port, (int)st.Mode, st.Roulette ? 1 : 0, st.Lives, s.PlayerCount,

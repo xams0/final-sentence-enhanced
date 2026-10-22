@@ -32,8 +32,13 @@ Dans les deux cas, les règles sont libres :
 - Roulette russe ou Vies, dans TOUS les modes (Battle royale, K.O., Duel). Avec les vies, chaque fois
   que le jeu aurait déclenché la roulette ou éliminé un joueur (dernier d'une manche, trop de fautes,
   manche trop longue), le joueur perd une vie. À 0 vie, le gardien l'exécute.
+- K.O. et Duel avec vies : seul celui qui perd sa dernière vie est éliminé. Le dernier d'un paragraphe
+  perd une vie et continue. La partie dure jusqu'à ce qu'il ne reste qu'un joueur : le serveur enchaîne
+  assez de paragraphes (plusieurs textes à la suite).
+- Battle royale avec vies : trop de fautes coûte une vie, puis le joueur continue à taper.
 - Les vies s'affichent en cœurs : « Xams - ♥♥♥ » à côté des noms en Duel, dans le classement (Tab),
   à côté de la langue du clavier dans les autres modes, et sur la ligne « Vies » de la création de partie.
+  Un cœur perdu s'anime, avec le clic à vide du revolver.
 - Roulette en K.O. : le dernier de chaque manche joue la roulette au lieu d'être éliminé.
 - Textes personnalisés (serveur dédié) : ils restent sur le PC du serveur ; les joueurs les découvrent
   au début de la partie, impossible de s'entraîner avant.
@@ -51,16 +56,20 @@ Le lanceur
 - Textes personnalisés : écrire ses textes (une ligne *** sépare deux manches). Les apostrophes et
   guillemets typographiques (’ “ ” …) sont remplacés par ceux du clavier (' " ...).
 "Lanppart3 Mod v3.x" s'affiche en bas à gauche de l'écran quand le mod est actif.
-Dans le jeu, "Code ou serveur LAN" (menu principal, Groupe) liste aussi les serveurs (le lanceur doit
-rester ouvert), et accepte une adresse IP:port.
+Dans le jeu, "Serveurs LAN" (menu principal, Groupe) liste les serveurs : cliquer sur le nom d'un serveur
+pour le rejoindre (le lanceur doit rester ouvert). Le code de lobby n'est plus proposé : on joue en
+réseau local ou Radmin VPN.
 
 Organiser avec un serveur dédié
 -------------------------------
-1. L'organisateur : "Héberger un serveur", choisir le mode, la langue, les textes, les bots, la
-   roulette ou les vies, la durée des manches... puis "Démarrer le serveur".
+1. L'organisateur : "Héberger un serveur", choisir le mode (ou un preset Lanppart Poules / Finales),
+   la langue, les textes, les bots, la roulette ou les vies, la durée des manches... puis "Démarrer le
+   serveur".
    Le serveur peut tourner sur le PC d'un joueur (même compte Steam) ou sur un PC dédié (son propre
    compte Steam qui possède le jeu : un même compte ne peut pas jouer sur deux PC à la fois).
-2. Les joueurs : "Rejoindre un serveur", choisir le serveur.
+2. Les joueurs : "Rejoindre un serveur" dans le lanceur (bouton "Rejoindre"), ou "Serveurs LAN" dans
+   le jeu (cliquer sur le nom du serveur). Ils voient "En attente du lancement de la partie par
+   l'organisateur..." jusqu'au départ.
 3. Quand tout le monde est là : l'organisateur clique "Lancer la partie" (les places libres sont
    complétées par des bots si demandé). À la fin, le serveur prépare tout seul la partie suivante.
 "Appliquer les réglages" change les règles pour la prochaine partie ; "Nouvelle partie" en ouvre une
@@ -80,8 +89,9 @@ Presets Lanppart Poules et Lanppart Finales (dans "Mode de jeu") : leurs règles
 lanceur, page "Presets Lanppart" (nom, mode, roulette ou vies, bots, fautes, durées). Le jeu les relit à
 chaque lancement : après un changement, relancer le jeu. Choisir un preset remplit la fenêtre avec ses
 règles et les verrouille ; vos propres réglages des modes Battle royale / K.O. / Duel restent intacts.
-Ce sont les presets de l'hôte du lobby qui comptent. Par défaut : Poules = Battle royale, 3 vies, sans
-bots ; Finales = Duel, 3 vies.
+Ce sont les presets de l'hôte du lobby qui comptent. Ils se choisissent aussi comme mode d'un serveur
+dédié. Par défaut : Poules = Battle royale, 3 vies, sans bots ; Finales = K.O., 3 vies, jusqu'à 8
+joueurs (seule la dernière vie élimine).
 
 Bon à savoir
 ------------

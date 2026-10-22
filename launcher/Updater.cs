@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Lanppart3Launcher
@@ -33,33 +34,60 @@ namespace Lanppart3Launcher
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         }
 
-        // Reads the latest release's tag from the redirect of /releases/latest (no API rate limit).
+        // Reads the latest release's tag: from the redirect of /releases/latest (no rate limit), else from the
+        // API (60 requests an hour per address; that redirect can lag behind a new release for a while).
         public async Task CheckAsync()
         {
             try
             {
-                var request = (HttpWebRequest)WebRequest.Create("https://github.com/" + Repository + "/releases/latest");
-                request.AllowAutoRedirect = false;
-                request.UserAgent = UserAgent;
-                request.Timeout = 15000;
-                using (var response = (HttpWebResponse)await request.GetResponseAsync())
-                {
-                    var location = response.Headers[HttpResponseHeader.Location] ?? "";
-                    int tagAt = location.LastIndexOf("/tag/", StringComparison.Ordinal);
-                    if (tagAt < 0) { State = UpdateState.UpToDate; return; }  // no release yet
-                    LatestTag = Uri.UnescapeDataString(location.Substring(tagAt + 5));
-                    if (!Version.TryParse(LatestTag.TrimStart('v', 'V'), out var latest)) { State = UpdateState.Unreachable; return; }
-                    Latest = latest;
-                    State = Normalize(latest) > Normalize(Current) ? UpdateState.Available : UpdateState.UpToDate;
-                }
-            }
-            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
-            {
-                State = UpdateState.UpToDate;  // no release published
+                LatestTag = await TagFromRedirect() ?? await TagFromApi();
+                if (LatestTag == null) { State = UpdateState.UpToDate; return; }  // no release published
+                if (!Version.TryParse(LatestTag.TrimStart('v', 'V'), out var latest)) { State = UpdateState.Unreachable; return; }
+                Latest = latest;
+                State = Normalize(latest) > Normalize(Current) ? UpdateState.Available : UpdateState.UpToDate;
             }
             catch (Exception ex) when (ex is WebException || ex is IOException)
             {
                 State = UpdateState.Unreachable;
+            }
+        }
+
+        static HttpWebRequest Request(string url)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.UserAgent = UserAgent;
+            request.Timeout = 15000;
+            return request;
+        }
+
+        static async Task<string> TagFromRedirect()
+        {
+            var request = Request("https://github.com/" + Repository + "/releases/latest");
+            request.AllowAutoRedirect = false;
+            using (var response = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                var location = response.Headers[HttpResponseHeader.Location] ?? "";
+                int tagAt = location.LastIndexOf("/tag/", StringComparison.Ordinal);
+                return tagAt < 0 ? null : Uri.UnescapeDataString(location.Substring(tagAt + 5));
+            }
+        }
+
+        static async Task<string> TagFromApi()
+        {
+            var request = Request("https://api.github.com/repos/" + Repository + "/releases/latest");
+            request.Accept = "application/vnd.github+json";
+            try
+            {
+                using (var response = (HttpWebResponse)await request.GetResponseAsync())
+                using (var reader = new StreamReader(response.GetResponseStream()))
+                {
+                    var match = Regex.Match(await reader.ReadToEndAsync(), "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+                    return match.Success ? match.Groups[1].Value : null;
+                }
+            }
+            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;  // no release
             }
         }
 

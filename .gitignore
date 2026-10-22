@@ -1,0 +1,13 @@
+# Only the mod's sources are versioned: the game, its decompiled code, tools and builds stay local.
+/*
+!/.gitignore
+!/README.md
+!/launcher/
+!/mod/
+!/native/
+!/tools/
+
+launcher/bin/
+launcher/obj/
+launcher/Payload/
+*.user

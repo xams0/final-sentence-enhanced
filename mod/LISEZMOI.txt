@@ -1,0 +1,92 @@
+LANPPART3 - parties entre amis aux règles libres pour Final Sentence (V3)
+========================================================================
+
+Installation
+------------
+Un seul fichier : Lanppart3-Final-Sentence.exe. Le mettre où vous voulez (Bureau...) et le lancer.
+- Il trouve Final Sentence tout seul dans Steam (sinon : « Dossier du jeu »).
+- Rien n'est copié dans le dossier du jeu : le lanceur démarre le jeu lui-même et y charge le mod
+  (fichiers du mod dans %APPDATA%\Lanppart3). Lancé depuis Steam, le jeu est toujours l'original.
+- Steam doit être ouvert, avec un compte qui possède le jeu.
+- Au premier lancement, Windows demande d'autoriser le lanceur sur le réseau : accepter (sinon les
+  serveurs n'apparaissent pas dans la liste). Pareil pour le jeu au premier serveur lancé.
+- Windows Defender peut se méfier d'un lanceur qui charge un mod dans un jeu : l'autoriser si besoin.
+
+Mises à jour
+------------
+Le lanceur vérifie les nouvelles versions sur https://github.com/xams0/final-sentence-enhanced/releases.
+Quand il y en a une, il ne lance plus le jeu tant qu'on ne l'a pas installée : bouton « Installer la vX »
+(il se remplace et redémarre tout seul). Tout le monde joue ainsi avec la même version du mod.
+Sans accès à internet (LAN coupé du monde), il laisse jouer avec la version qu'il a.
+Ancienne installation (V1/V2, fichiers copiés dans le dossier du jeu) : le lanceur V3 la retire tout seul.
+
+Deux façons de jouer
+--------------------
+1. SERVEUR DÉDIÉ (recommandé en compétition)
+   Un PC fait tourner un serveur Lanppart3 : une instance du jeu sans fenêtre ni joueur, pilotée depuis
+   le lanceur. Personne n'a l'avantage d'un ping nul. On peut lancer plusieurs serveurs en même temps.
+2. LOBBY
+   L'hôte d'un lobby Steam héberge la partie sur son propre PC et joue en même temps (ping nul pour lui).
+
+Dans les deux cas, les règles sont libres :
+- Roulette russe ou Vies, dans TOUS les modes (Battle royale, K.O., Duel). Avec les vies, chaque fois
+  que le jeu aurait déclenché la roulette ou éliminé un joueur (dernier d'une manche, trop de fautes,
+  manche trop longue), le joueur perd une vie. À 0 vie, le gardien l'exécute.
+- Les vies s'affichent en cœurs : « Xams - ♥♥♥ » à côté des noms en Duel, dans le classement (Tab),
+  à côté de la langue du clavier dans les autres modes, et sur la ligne « Vies » de la création de partie.
+- Roulette en K.O. : le dernier de chaque manche joue la roulette au lieu d'être éliminé.
+- Textes personnalisés (serveur dédié) : ils restent sur le PC du serveur ; les joueurs les découvrent
+  au début de la partie, impossible de s'entraîner avant.
+
+TOUS les joueurs lancent le jeu avec le lanceur, en mode Lanppart3.
+
+Le lanceur
+----------
+- Mode normal : le jeu original, serveurs officiels (parties rapides, classement, ligues...).
+- Mode Lanppart3 : le jeu avec le mod (lobbys hébergés par l'hôte).
+- Rejoindre un serveur : liste des serveurs Lanppart3 du réseau local et de Radmin VPN ; cliquer
+  "Rejoindre" lance le jeu et s'y connecte. Ou taper l'adresse IP:port du serveur.
+- Héberger un serveur : créer, régler, démarrer et piloter des serveurs dédiés.
+- Textes personnalisés : écrire ses textes (une ligne *** sépare deux manches). Les apostrophes et
+  guillemets typographiques (’ “ ” …) sont remplacés par ceux du clavier (' " ...).
+"Lanppart3 Mod v3.x" s'affiche en bas à gauche de l'écran quand le mod est actif.
+Dans le jeu, "Code ou serveur LAN" (menu principal, Groupe) liste aussi les serveurs (le lanceur doit
+rester ouvert), et accepte une adresse IP:port.
+
+Organiser avec un serveur dédié
+-------------------------------
+1. L'organisateur : "Héberger un serveur", choisir le mode, la langue, les textes, les bots, la
+   roulette ou les vies, la durée des manches... puis "Démarrer le serveur".
+   Le serveur peut tourner sur le PC d'un joueur (même compte Steam) ou sur un PC dédié (son propre
+   compte Steam qui possède le jeu : un même compte ne peut pas jouer sur deux PC à la fois).
+2. Les joueurs : "Rejoindre un serveur", choisir le serveur.
+3. Quand tout le monde est là : l'organisateur clique "Lancer la partie" (les places libres sont
+   complétées par des bots si demandé). À la fin, le serveur prépare tout seul la partie suivante.
+"Appliquer les réglages" change les règles pour la prochaine partie ; "Nouvelle partie" en ouvre une
+tout de suite.
+
+Radmin VPN : il suffit que tout le monde soit dans le même réseau Radmin ; les serveurs apparaissent
+dans la liste, ou se rejoignent avec l'adresse Radmin de l'organisateur (26.x.x.x:7777).
+
+Jouer avec un lobby
+-------------------
+1. Tout le monde lance le jeu en mode Lanppart3.
+2. L'hôte ouvre "Partie personnalisée", choisit le mode et les règles, puis "Créer".
+3. Les autres rejoignent le lobby (invitation Steam ou code), puis tout le monde clique "Prêt(e)".
+Décocher "Jouer à la roulette russe" fait apparaître la ligne "Vies". Presets : Lanppart Poules
+(Battle royale sans bots) et Lanppart Finales (Duel avec vies).
+
+Bon à savoir
+------------
+- Ces parties ne comptent pas pour les statistiques, classements et ligues officiels.
+- Un joueur doit rejoindre pendant l'attente : une partie lancée ne prend plus personne.
+- Réglages avancés : %APPDATA%\Lanppart3\runtime\<version>\Mods\Lanppart\Scripts\config.lua
+  (remis à zéro à chaque mise à jour).
+
+Désinstallation
+---------------
+Supprimer Lanppart3-Final-Sentence.exe et le dossier %APPDATA%\Lanppart3 (réglages, serveurs, textes).
+
+Version testée : Final Sentence 0.7.2 (révision 18880). Après une mise à jour du jeu, les fonctions
+Lanppart3 se désactivent d'elles-mêmes (le mod vérifie le code du jeu avant de le modifier) et le mod
+devra être adapté.

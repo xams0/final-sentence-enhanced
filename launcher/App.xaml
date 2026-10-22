@@ -1,0 +1,273 @@
+<Application x:Class="Lanppart3Launcher.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+  <Application.Resources>
+    <!-- Final Sentence's look: its typewriter font, cream text, orange captions on a dark room. -->
+    <FontFamily x:Key="GameFont">pack://application:,,,/Assets/#Special Elite (Rus by Lomzz)</FontFamily>
+    <SolidColorBrush x:Key="Cream" Color="#EDE3C8" />
+    <SolidColorBrush x:Key="CreamDim" Color="#B9AD92" />
+    <SolidColorBrush x:Key="Caption" Color="#D68A44" />
+    <SolidColorBrush x:Key="Frame" Color="#C27A39" />
+    <SolidColorBrush x:Key="Muted" Color="#8C8273" />
+    <SolidColorBrush x:Key="TitleRed" Color="#8E1B10" />
+
+    <Style x:Key="SectionCaption" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="21" />
+      <Setter Property="Foreground" Value="{StaticResource Caption}" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
+    <!-- Menu entry: plain cream text, framed in orange when pointed at, like the game's menu. -->
+    <Style x:Key="MenuEntry" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource Cream}" />
+      <Setter Property="FontSize" Value="23" />
+      <Setter Property="Margin" Value="44,2,0,2" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Box" BorderThickness="2" BorderBrush="Transparent" Background="Transparent"
+                    Padding="16,7,16,5" SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
+                <Setter TargetName="Box" Property="Background" Value="#33140C06" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="TopEntry" TargetType="Button" BasedOn="{StaticResource MenuEntry}">
+      <Setter Property="Margin" Value="-18,2,0,2" />
+    </Style>
+
+    <Style x:Key="WindowButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource CreamDim}" />
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Box" Background="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Box" Property="Background" Value="#40000000" />
+                <Setter Property="Foreground" Value="{StaticResource Cream}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- The game's lobby options window: pale captions, peach labels, orange fields. -->
+    <SolidColorBrush x:Key="OptionCaption" Color="#DCE6B8" />
+    <SolidColorBrush x:Key="OptionLabel" Color="#E6A46C" />
+    <SolidColorBrush x:Key="FieldOrange" Color="#C8692A" />
+    <SolidColorBrush x:Key="FieldOrangeHover" Color="#DD7A35" />
+    <SolidColorBrush x:Key="PanelBack" Color="#D9120C08" />
+    <SolidColorBrush x:Key="CheckGreen" Color="#9BD66B" />
+
+    <!-- Framed action button, like the game's "Créer" / "Annuler". -->
+    <Style x:Key="ActionButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource Caption}" />
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Margin" Value="0,4,0,4" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Box" BorderThickness="2" BorderBrush="{StaticResource Frame}" Background="#AA0B0705"
+                    Padding="14,8,14,6" SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Box" Property="Background" Value="#55C8692A" />
+                <Setter Property="Foreground" Value="{StaticResource Cream}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Box" Property="BorderBrush" Value="#55C27A39" />
+                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Small text button (steppers, tabs). -->
+    <Style x:Key="PlainButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource OptionLabel}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Box" Background="Transparent" Padding="6,0,6,0" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource Cream}" />
+              </Trigger>
+              <Trigger Property="Tag" Value="Selected">
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
+                <Setter Property="Foreground" Value="{StaticResource Cream}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="#55E6A46C" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Orange drop-down list, like the game's option combo boxes. -->
+    <Style x:Key="GameComboItem" TargetType="ComboBoxItem">
+      <Setter Property="Foreground" Value="{StaticResource Cream}" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="Box" Background="Transparent" Padding="12,5,12,4">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Box" Property="Background" Value="#7FA35B" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="GameCombo" TargetType="ComboBox">
+      <Setter Property="Foreground" Value="{StaticResource Cream}" />
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="ItemContainerStyle" Value="{StaticResource GameComboItem}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <ToggleButton x:Name="Toggle" Focusable="False" ClickMode="Press"
+                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Box" Background="{StaticResource FieldOrange}" CornerRadius="2">
+                      <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0" Fill="{StaticResource Cream}"
+                            Data="M 0 0 L 12 0 L 6 6 Z" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Box" Property="Background" Value="{StaticResource FieldOrangeHover}" />
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <ContentPresenter IsHitTestVisible="False" Margin="16,4,40,0" VerticalAlignment="Center"
+                                Content="{TemplateBinding SelectionBoxItem}" />
+              <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False"
+                     PopupAnimation="Fade">
+                <Border Background="#F2160E09" BorderBrush="{StaticResource FieldOrange}" BorderThickness="1"
+                        MinWidth="{TemplateBinding ActualWidth}" MaxHeight="320">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsPresenter />
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Square check box with a green tick, like the game's. -->
+    <Style x:Key="GameCheck" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Border x:Name="Box" Width="28" Height="28" BorderThickness="2" BorderBrush="{StaticResource OptionLabel}"
+                    Background="#33000000" HorizontalAlignment="Left">
+              <Path x:Name="Tick" Visibility="Collapsed" Stroke="{StaticResource CheckGreen}" StrokeThickness="3.5"
+                    Data="M 4 12 L 10 19 L 22 4" Margin="1" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="GameText" TargetType="TextBox">
+      <Setter Property="Foreground" Value="{StaticResource Cream}" />
+      <Setter Property="Background" Value="#66000000" />
+      <Setter Property="BorderBrush" Value="{StaticResource FieldOrange}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CaretBrush" Value="{StaticResource Cream}" />
+      <Setter Property="SelectionBrush" Value="{StaticResource FieldOrange}" />
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="Padding" Value="8,5,8,4" />
+    </Style>
+
+    <!-- Thin orange scroll bar, like the game's options window. -->
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="6" />
+      <Setter Property="MinWidth" Value="6" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+              <Track.Thumb>
+                <Thumb>
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border Background="{StaticResource FieldOrange}" CornerRadius="2" />
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Application.Resources>
+</Application>

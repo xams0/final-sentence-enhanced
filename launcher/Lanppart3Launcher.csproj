@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- .NET Framework 4.8 ships with Windows 10/11: the launcher runs without installing anything. -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Lanppart3 Final Sentence</AssemblyName>
+    <RootNamespace>Lanppart3Launcher</RootNamespace>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>3.0.0</Version>
+    <Product>Lanppart3 Final Sentence</Product>
+    <Description>Lanceur Final Sentence : mode normal ou mode Lanppart3</Description>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\background.jpg" />
+    <Resource Include="Assets\SpecialElite.ttf" />
+    <Resource Include="Assets\icon.ico" />
+  </ItemGroup>
+
+  <!-- The mod itself (UE4SS + scripts), built by mod/package.sh: unpacked and injected at runtime. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Payload\mod.zip" LogicalName="mod.zip" Condition="Exists('Payload\mod.zip')" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+</Project>

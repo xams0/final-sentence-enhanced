@@ -660,6 +660,50 @@ static void* GetWriterOrNull(void* playerStart, int32_t writerId) {
 #define RVA_ONREP_CONTROLLER_NEXT   0x3871160  // je ... (after the GC barrier flag test)
 #define RVA_ONREP_CONTROLLER_SKIP   0x3871188
 
+// ---- Dedicated server: voice chat ----
+// UVoiceChannel::ReceivedBunch, on a listen server, credits incoming voice to the first local player
+// controller's player state. A dedicated server (listen server without a local player) has none: a player
+// talking (CTRL) crashed it reading null+2B0h. Detour: no local controller, the voice goes the way of a
+// real dedicated server.
+#define RVA_VOICE_LOCAL_PS         0x3E0E7A0  // mov rcx, r15; mov rdx, [rax+2B0h] (rax: local controller)
+#define RVA_VOICE_LOCAL_PS_NEXT    0x3E0E7AA
+#define RVA_VOICE_NOT_LISTEN       0x3E0E7DF  // the branch taken when the net mode isn't listen server
+
+static int PatchVoiceWithoutLocalPlayer(void) {
+    static const uint8_t expected[] = {
+        0x49, 0x8B, 0xCF,                          // mov rcx, r15
+        0x48, 0x8B, 0x90, 0xB0, 0x02, 0x00, 0x00,  // mov rdx, [rax+2B0h]
+    };
+    uint8_t* site = (uint8_t*)AT(RVA_VOICE_LOCAL_PS);
+    if (memcmp(site, expected, sizeof(expected)) != 0) {
+        Log("Voice patch refused: unexpected bytes");
+        return 0;
+    }
+    uint8_t* stub = AllocNear(64);
+    if (!stub) return 0;
+    uint8_t code[] = {
+        0x48, 0x85, 0xC0,                          // test rax, rax
+        0x74, 0x16,                                // jz skip
+        0x49, 0x8B, 0xCF,                          // mov rcx, r15
+        0x48, 0x8B, 0x90, 0xB0, 0x02, 0x00, 0x00,  // mov rdx, [rax+2B0h]
+        0x48, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0,        // mov rax, next
+        0xFF, 0xE0,                                // jmp rax
+        0x48, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0,        // skip: mov rax, not-listen branch
+        0xFF, 0xE0,                                // jmp rax
+    };
+    uint64_t next = (uint64_t)(uintptr_t)AT(RVA_VOICE_LOCAL_PS_NEXT);
+    uint64_t skip = (uint64_t)(uintptr_t)AT(RVA_VOICE_NOT_LISTEN);
+    memcpy(code + 17, &next, 8);
+    memcpy(code + 29, &skip, 8);
+    memcpy(stub, code, sizeof(code));
+    uint8_t jmp[10] = { 0xE9, 0, 0, 0, 0, 0x90, 0x90, 0x90, 0x90, 0x90 };  // jmp stub (replaces both movs)
+    int32_t rel = (int32_t)(stub - (site + 5));
+    memcpy(jmp + 1, &rel, 4);
+    if (!WriteCode(site, jmp, sizeof(jmp))) return 0;
+    Log("Voice without local player patched");
+    return 1;
+}
+
 static int PatchRemoteControllerCamera(void) {
     static const uint8_t expected[] = {
         0x80, 0x3D, 0x38, 0x5F, 0x0D, 0x03, 0x00,  // cmp byte [GC barrier flag], 0
@@ -861,6 +905,7 @@ static int Install(void) {
     if (!PatchGameNetModeCalls()) return 0;
     if (!PatchLives()) return 0;
     if (!PatchRemoteControllerCamera()) return 0;
+    if (!getenv("LANPPART3_DEV_NO_VOICE_PATCH")) PatchVoiceWithoutLocalPlayer();  // (dedicated servers need it; not fatal)
     if (!PatchPostLogin()) return 0;
     if (!PatchIrisServerUpdate()) return 0;
     if (!PatchServerRpcAccess()) return 0;

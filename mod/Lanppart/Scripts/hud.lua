@@ -121,6 +121,32 @@ local function OnEntryUpdated(entry, ps)
     end
 end
 
+-- The scoreboard's header gets a "Vies" column title over the hearts, in the room the game keeps for its
+-- bullets column (BulletSpacer), so that every column stays above its values.
+local livesHeaders = {}  -- scoreboard address -> "Vies" text block
+
+local function ShowLivesHeader(hud)
+    local menu = hud.TabMenuWidget
+    if not (Valid(menu) and Valid(menu.BulletSpacer) and Valid(menu.MistakesText)) then return end
+    local key = menu:GetAddress()
+    local title = livesHeaders[key]
+    if not Valid(title) then
+        local spacer = menu.BulletSpacer
+        title = StaticConstructObject(StaticFindObject("/Script/UMG.TextBlock"), menu.WidgetTree)
+        title:SetText(FText("Vies"))
+        title:SetFont(menu.MistakesText.Font)
+        title:SetColorAndOpacity(menu.MistakesText.ColorAndOpacity)
+        title:SetJustification(1)  -- centred
+        local slot = spacer:GetParent():AddChildToHorizontalBox(title)
+        slot:SetSize(spacer.Slot.Size)
+        slot:SetPadding(spacer.Slot.Padding)
+        slot:SetHorizontalAlignment(spacer.Slot.HorizontalAlignment)
+        slot:SetVerticalAlignment(spacer.Slot.VerticalAlignment)
+        livesHeaders[key] = title
+    end
+    if menu.BulletSpacer:GetVisibility() ~= 1 then menu.BulletSpacer:SetVisibility(1) end  -- collapsed: the title takes its room
+end
+
 local bulletsHooked, entriesHooked = false, false
 
 local function Guarded(fn)
@@ -185,6 +211,7 @@ function Hud.Tick()
     if not (Valid(hud) and Valid(hud.PlayerState)) then return end
     local duel = gs.GameplayOptions.TypeMode == TYPEMODE_DUEL
     SetUpHud(hud, duel)
+    ShowLivesHeader(hud)
     -- The revolver drums would show the lost lives as loaded chambers.
     Hide(hud.CylinderAssembly)
     Hide(hud.CylinderAssemblyRight)

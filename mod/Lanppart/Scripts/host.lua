@@ -2,6 +2,7 @@
 local Config = require("config")
 local Native = require("native")
 local Texts = require("texts")
+local Presets = require("presets")
 
 local Host = {}
 
@@ -9,7 +10,6 @@ local TYPEMODE_BATTLEROYAL = 0
 local TYPEMODE_KNOCKDOWN = 1
 local TYPEMODE_DUEL = 2
 local SESSION_WAITING_FOR_PLAYERS = 2
-local BOTS_MARKER = -2  -- lobby presets (menu.lua): no bots
 local MAPS = {
     [TYPEMODE_BATTLEROYAL] = "/Game/TheEnd/maps/game/lvlg_game_battleroyale",
     [TYPEMODE_KNOCKDOWN] = "/Game/TheEnd/maps/game/lvlg_game_knockdown",
@@ -99,7 +99,8 @@ end
 -- Returns the options and whether the session plays with lives.
 function Host.SessionOptions(lobbyOptions, members, capacity)
     local o = Host.CopyOptions(lobbyOptions)
-    if o.BotsCount == BOTS_MARKER then o.BotsCount = 0 end
+    local preset, presetBots = Presets.FromMarker(o.BotsCount, o.TypeMode)
+    if preset then o.BotsCount = presetBots end  -- (-1: fill the free places, below)
     if o.BotsCount < 0 and members and capacity then o.BotsCount = math.max(0, capacity - members) end
     local lives = not o.bPlayRoulette
     if lives then

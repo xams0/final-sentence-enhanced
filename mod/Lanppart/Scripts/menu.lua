@@ -1,8 +1,8 @@
 -- Lobby options window (Partie personnalisée, Créer nouveau, lobby "Options") with the mod:
 --  * "Jouer à la roulette russe" can be changed in every mode. Unchecked, the "Vies" line replaces the
 --    revolver settings: each roulette or elimination of the game then costs a life (lanppart_native.c).
---  * Two presets are added to the mode list: Lanppart Poules (Battle Royale without bots) and
---    Lanppart Finales (Duel with lives).
+--  * Two presets are added to the mode list, Lanppart Poules and Lanppart Finales: complete rule sets
+--    edited in the launcher (presets.lua). Choosing one fills the window with its rules and locks them.
 --
 -- The blueprint maps the mode list index straight to EPGTypeMode, so the presets are reported as their
 -- base mode to it, and this module adjusts the widgets after each blueprint update (UE4SS runs blueprint
@@ -10,6 +10,7 @@
 -- also uses without the mod, on the official servers: Duel / K.O. roulette rules stay out of the save.
 local Config = require("config")
 local Hearts = require("hearts")
+local Presets = require("presets")
 
 local Menu = {}
 
@@ -22,17 +23,24 @@ local WINDOW_MODE_CREATE = 0     -- e_lobbyoptions_mode: new lobby
 local WINDOW_MODE_VIEW = 2       -- e_lobbyoptions_mode: lobby member looking at the host's options
 local VIS_COLLAPSED, VIS_HIDDEN = 1, 2
 local VALIGN_CENTER = 2
-local BOTS_MARKER = -2           -- never a real bots count (Duel and K.O. use -1, Battle Royale 0..39)
 local MAX_CHAMBERS = 6           -- revolver chambers, also the most lives
 local MAX_MISTAKES = 10
 local LIVES_TITLE = "Vies"
 
 -- Appended after the game's own modes (Battle royale, K.O., Duel).
 local FIRST_INDEX = 3
-local PRESETS = {
-    { Key = "poules", Name = "Lanppart Poules", Base = TYPEMODE_BATTLEROYAL },
-    { Key = "finales", Name = "Lanppart Finales", Base = TYPEMODE_DUEL },
-}
+local PRESETS = {}
+for i, p in ipairs(Presets.List) do
+    PRESETS[i] = { Key = p.Key, Name = p.Name, Base = p.Mode, Index = i, Rules = p }
+end
+
+-- The widgets of the rules: a preset sets and locks them.
+local RULE_WIDGETS = { "IsPrivateCheckbox", "BotsNumStepper", "BotsDifficultyComboBox", "MistakesBehaviourComboBox",
+                       "CapitalsMatterCheckbox", "PlayRouletteCheckbox", "BulletSlotsStepper", "InitialBulletsStepper",
+                       "MaxMistakesPerRoundStepper", "RoundDurationStepper", "PauseDurationStepper", "ResetButton" }
+-- Scalar fields of FPGGameplayOptions (the saved text selection and language are left alone).
+local OPTION_FIELDS = { "bIsPrivate", "BotsCount", "BotsDifficulty", "MistakeBehaviour", "bCapitalsMatter", "bPlayRoulette",
+                        "MaxMistakesPerRound", "BulletSlotsNum", "InitialBulletsNum", "RoundDuration", "PauseDuration" }
 
 -- Saved options the official game restricts (Duel always plays the roulette, K.O. never does).
 local ROULETTE_FIELDS = { "bPlayRoulette", "BulletSlotsNum", "InitialBulletsNum", "MaxMistakesPerRound" }
@@ -40,18 +48,16 @@ local ROULETTE_FIELDS = { "bPlayRoulette", "BulletSlotsNum", "InitialBulletsNum"
 local typeCombos = {}     -- addresses of the windows' mode lists
 local windowState = {}    -- per window address
 local savedRules = {}     -- type mode -> ROULETTE_FIELDS values of the player's save
+local presetGuard = {}    -- type mode -> the player's saved options, kept while a preset fills the window
 local pendingStamp = nil  -- rules of the options the window just produced (Créer / Appliquer)
 local hooksRegistered = false
 
 -- "poules", "finales" or nil: the preset the lobby options were made with.
 function Menu.IsLanppart(opts)
-    if not opts.bIsPrivate or opts.BotsCount ~= BOTS_MARKER then return nil end
-    if opts.TypeMode == TYPEMODE_DUEL then return "finales" end
-    if opts.TypeMode == TYPEMODE_BATTLEROYAL then return "poules" end
-    return nil
+    if not opts.bIsPrivate then return nil end
+    local index = Presets.FromMarker(opts.BotsCount, opts.TypeMode)
+    return index and PRESETS[index].Key or nil
 end
-
-Menu.BOTS_MARKER = BOTS_MARKER
 
 local function Valid(o) return o and o:IsValid() end
 
@@ -105,9 +111,9 @@ local function StateOf(w)
             SlotsTitle = w.BulletSlotsStepper.TitleText:GetText(),
             InitialBulletsVisibility = w.InitialBulletsStepper:GetVisibility(),
             RevolverDrumVisibility = w.RevolverDrum:GetVisibility(),
-            IsPrivateEnabled = w.IsPrivateCheckbox:GetIsEnabled(),
-            BotsDifficultyEnabled = w.BotsDifficultyComboBox:GetIsEnabled(),
+            Enabled = {},
         }
+        for _, name in ipairs(RULE_WIDGETS) do state.Enabled[name] = w[name]:GetIsEnabled() end
         windowState[key] = state
     end
     return state
@@ -120,6 +126,45 @@ local function RememberSavedRules(typeMode)
     local values = {}
     for _, f in ipairs(ROULETTE_FIELDS) do values[f] = saved[f] end
     savedRules[typeMode] = values
+end
+
+-- The player's saved options of a mode stay as they are while a preset fills the window (the window
+-- saves each change it sees).
+local function GuardSave(typeMode)
+    if presetGuard[typeMode] then return end
+    local saved = {}
+    FindFirstOf("PGSaveGame"):GetGameplayOptionsForMode(typeMode, saved)
+    local values = {}
+    for _, f in ipairs(OPTION_FIELDS) do values[f] = saved[f] end
+    presetGuard[typeMode] = values
+end
+
+local function SetStepper(stepper, value)
+    if stepper.Stepper ~= value then stepper:SetStepper(value) end
+end
+
+local function SetChecked(checkbox, value)
+    if checkbox.CheckBoxBtn:IsChecked() ~= value then checkbox.CheckBoxBtn:SetIsChecked(value) end
+end
+
+local function SetComboIndex(combobox, index)
+    local combo = combobox.ComboBoxBtn
+    if combo:GetSelectedIndex() ~= index and index < combo:GetOptionCount() then combo:SetSelectedIndex(index) end
+end
+
+-- Shows a preset's rules in the window (the lobby gets them from Stamp).
+local function ShowPreset(w, p)
+    SetChecked(w.IsPrivateCheckbox, true)
+    if p.Bots >= w.BotsNumStepper.MinStepper then SetStepper(w.BotsNumStepper, math.min(p.Bots, w.BotsNumStepper.MaxStepper)) end
+    SetComboIndex(w.BotsDifficultyComboBox, p.BotsDifficulty)
+    SetComboIndex(w.MistakesBehaviourComboBox, p.MistakeBehaviour)
+    SetChecked(w.CapitalsMatterCheckbox, p.CapitalsMatter)
+    SetChecked(w.PlayRouletteCheckbox, p.Roulette)
+    SetStepper(w.RoundDurationStepper, p.RoundDuration)
+    if p.Mode == TYPEMODE_BATTLEROYAL then
+        SetStepper(w.MaxMistakesPerRoundStepper, p.MaxMistakesPerRound)
+        SetStepper(w.PauseDurationStepper, p.PauseDuration)
+    end
 end
 
 local function SetRange(stepper, lo, hi)
@@ -151,23 +196,22 @@ Adjust = function(w)
     local editable = w.Mode ~= WINDOW_MODE_VIEW
     if base == TYPEMODE_DUEL or base == TYPEMODE_KNOCKDOWN then RememberSavedRules(base) end
 
-    -- Presets: sessions for the lobby's members only, no bots.
+    -- Presets: their rules, locked (they are edited in the launcher).
     if preset then
-        w.IsPrivateCheckbox.CheckBoxBtn:SetIsChecked(true)
-        SetEnabled(w.IsPrivateCheckbox, false)
-        SetEnabled(w.BotsDifficultyComboBox, false)
-        SetEnabled(w.BotsNumStepper, false)
-        if preset.Key == "poules" and w.BotsNumStepper.Stepper ~= 0 then w.BotsNumStepper:SetStepper(0) end
-    elseif state.Preset then
-        SetEnabled(w.IsPrivateCheckbox, state.IsPrivateEnabled and editable)
-        SetEnabled(w.BotsDifficultyComboBox, state.BotsDifficultyEnabled and editable)
+        GuardSave(base)
+        if editable then ShowPreset(w, preset.Rules) end  -- (a member sees the lobby's own values)
+        for _, name in ipairs(RULE_WIDGETS) do SetEnabled(w[name], false) end
+    else
+        presetGuard = {}
+        if state.Preset then
+            for _, name in ipairs(RULE_WIDGETS) do SetEnabled(w[name], state.Enabled[name] and editable) end
+        end
     end
     state.Preset = preset and preset.Key
+    local rulesEditable = editable and not preset
 
     local roulette = w.PlayRouletteCheckbox
-    local finales = preset and preset.Key == "finales"
-    if finales and roulette.CheckBoxBtn:IsChecked() then roulette.CheckBoxBtn:SetIsChecked(false) end
-    SetEnabled(roulette, editable and not finales)
+    SetEnabled(roulette, rulesEditable)
     local withRoulette = roulette.CheckBoxBtn:IsChecked()
     -- Unchecked by the player just now (not on opening: the saved lives stay).
     local changed = state.Roulette ~= nil and state.Roulette ~= withRoulette
@@ -180,13 +224,16 @@ Adjust = function(w)
         w.RevolverDrum:SetVisibility(state.RevolverDrumVisibility)
         Hearts.Show(state.Hearts, false)
         SetRange(slots, 1, MAX_CHAMBERS)
+        if preset and editable then SetStepper(slots, preset.Rules.BulletSlots) end
         SetRange(initial, 0, slots.Stepper - 1)
+        if preset and editable then SetStepper(initial, preset.Rules.InitialBullets) end
     else
         slots.TitleText:SetText(FText(LIVES_TITLE))
         initial:SetVisibility(VIS_COLLAPSED)
         w.RevolverDrum:SetVisibility(VIS_HIDDEN)
         SetRange(slots, 1, MAX_CHAMBERS)
-        if changed and editable then slots:SetStepper(Clamp(Config.FinalesLives, 1, MAX_CHAMBERS)) end
+        if changed and rulesEditable then slots:SetStepper(Clamp(Config.FinalesLives, 1, MAX_CHAMBERS)) end
+        if preset and editable then SetStepper(slots, preset.Rules.Lives) end
         if initial.Stepper ~= 0 then initial:SetStepper(0) end
         -- The lives as hearts, where the drum was.
         if not state.Hearts then
@@ -199,11 +246,11 @@ Adjust = function(w)
         Hearts.Show(state.Hearts, true)
         Hearts.Set(state.Hearts, slots.Stepper, slots.Stepper)
     end
-    SetEnabled(slots, editable)
-    SetEnabled(initial, editable and withRoulette)
+    SetEnabled(slots, rulesEditable)
+    SetEnabled(initial, rulesEditable and withRoulette)
     -- Battle Royale: reaching the mistakes limit of a round triggers the roulette, or costs a life.
     if base == TYPEMODE_BATTLEROYAL then SetRange(mistakes, 1, MAX_MISTAKES) end
-    SetEnabled(mistakes, editable and base == TYPEMODE_BATTLEROYAL)
+    SetEnabled(mistakes, rulesEditable and base == TYPEMODE_BATTLEROYAL)
 end
 
 -- The window was opened on the lobby's options (host editing them, or a member looking at them).
@@ -229,6 +276,9 @@ local function ShowLobbyOptions(w)
     w.BulletSlotsStepper:SetStepper(Clamp(opts.BulletSlotsNum, 1, MAX_CHAMBERS))
     if opts.bPlayRoulette then w.InitialBulletsStepper:SetStepper(math.max(0, opts.InitialBulletsNum)) end
     if opts.TypeMode == TYPEMODE_BATTLEROYAL then w.MaxMistakesPerRoundStepper:SetStepper(opts.MaxMistakesPerRound) end
+    -- A preset lobby's bots count is its marker: show the bots it stands for.
+    local _, bots = Presets.FromMarker(opts.BotsCount, opts.TypeMode)
+    if bots and bots >= w.BotsNumStepper.MinStepper then w.BotsNumStepper:SetStepper(bots) end
 end
 
 -- Writes the window's rules into options it is sending to the lobby, in place.
@@ -236,20 +286,22 @@ local function Stamp(opts)
     local p = pendingStamp
     pendingStamp = nil
     if not p or os.clock() - p.Time > 1 then return end
+    if p.Preset then
+        Presets.Stamp(opts, p.Preset.Index)
+        print(string.format("[Lanppart] lobby options: preset %s\n", p.Preset.Name))
+        return
+    end
     opts.TypeMode = p.Base
     opts.bPlayRoulette = p.Roulette
     opts.BulletSlotsNum = Clamp(p.Slots, 1, MAX_CHAMBERS)
     opts.InitialBulletsNum = p.Roulette and Clamp(p.Initial, 0, opts.BulletSlotsNum - 1) or 0
     if p.Base == TYPEMODE_BATTLEROYAL then opts.MaxMistakesPerRound = Clamp(p.Mistakes, 1, MAX_MISTAKES) end
-    if p.Preset then
-        opts.bIsPrivate = true
-        opts.BotsCount = BOTS_MARKER
-    elseif opts.BotsCount == BOTS_MARKER then
+    if Presets.FromMarker(opts.BotsCount, opts.TypeMode) then
         local saved = {}
         FindFirstOf("PGSaveGame"):GetGameplayOptionsForMode(p.Base, saved)
         opts.BotsCount = saved.BotsCount
     end
-    print(string.format("[Lanppart] lobby options: mode %s, %s %d\n", p.Preset and p.Preset.Name or tostring(p.Base),
+    print(string.format("[Lanppart] lobby options: mode %s, %s %d\n", tostring(p.Base),
         p.Roulette and "roulette, chambers" or "lives", opts.BulletSlotsNum))
 end
 
@@ -268,10 +320,11 @@ RegisterHook("/Script/UMG.ComboBoxString:GetSelectedIndex", function() end, func
     return p and p.Base or nil
 end)
 RegisterHook("/Script/TheEndClient.PGSaveGame:SetGameplayOptionsForMode", Guard(function(_, typeMode, options)
-    local rules = savedRules[typeMode:get()]
-    if not rules then return end
     local opts = options:get()
-    for f, v in pairs(rules) do opts[f] = v end
+    local mode = typeMode:get()
+    for _, rules in pairs({ presetGuard[mode] or {}, savedRules[mode] or {} }) do
+        for f, v in pairs(rules) do opts[f] = v end
+    end
 end))
 for _, fn in ipairs({ "CreateLobby", "UpdateGameplayOptions" }) do
     RegisterHook("/Script/TheEndClient.PGSteamLobbySubsystem:" .. fn, Guard(function(_, options)

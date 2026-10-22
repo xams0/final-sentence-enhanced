@@ -6,6 +6,7 @@ aux règles libres, en LAN ou via Radmin VPN.
 - **Serveurs dédiés** pilotés depuis le lanceur (sans fenêtre, plusieurs à la fois), ou lobby hébergé
   par l'hôte.
 - **Roulette russe ou vies** dans tous les modes (Battle royale, K.O., Duel), affichées en cœurs.
+- **Presets de lobby** (Lanppart Poules, Lanppart Finales) entièrement réglables dans le lanceur.
 - **Textes personnalisés** gardés sur le serveur : les joueurs les découvrent en jouant.
 - **Liste des serveurs** du réseau local dans le lanceur et dans le jeu.
 

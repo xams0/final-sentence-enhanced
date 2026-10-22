@@ -98,6 +98,8 @@
               Click="OnLaunchNormal" MouseEnter="OnPointNormal" GotKeyboardFocus="OnPointNormal" />
       <Button x:Name="ModButton" Style="{StaticResource MenuEntry}" Content="Mode Lanppart3"
               Click="OnLaunchLanppart" MouseEnter="OnPointLanppart" GotKeyboardFocus="OnPointLanppart" />
+      <Button Style="{StaticResource MenuEntry}" Content="Presets Lanppart"
+              Click="OnShowPresets" MouseEnter="OnPointPresets" GotKeyboardFocus="OnPointPresets" />
 
       <TextBlock Text="Serveurs LAN" Style="{StaticResource SectionCaption}" Margin="0,20,0,6" />
       <Button x:Name="BrowserButton" Style="{StaticResource MenuEntry}" Content="Rejoindre un serveur"

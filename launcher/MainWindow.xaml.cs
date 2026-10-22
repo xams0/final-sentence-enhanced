@@ -43,6 +43,8 @@ namespace Lanppart3Launcher
             watch.Tick += (s, e) => WatchGame();
             watch.Start();
             RemoveOldModFiles();
+            try { PresetStore.WriteLua(); }  // the mod's copy of the lobby presets
+            catch (IOException) { }
             ShowWhy();
             RefreshState();
             CheckForUpdate();
@@ -120,7 +122,7 @@ namespace Lanppart3Launcher
             "Lance le jeu avec le mod Lanppart3. Toute partie lancée depuis un lobby (Partie personnalisée, " +
             "Créer nouveau) est hébergée par le PC de l'hôte du lobby au lieu des serveurs officiels.\n\n" +
             "Les règles deviennent libres : roulette russe ou vies dans tous les modes, presets Lanppart Poules " +
-            "et Lanppart Finales.\n\n" +
+            "et Lanppart Finales (réglables dans « Presets Lanppart »).\n\n" +
             "Tous les joueurs du lobby doivent lancer le jeu dans ce mode.");
 
         void OnPointWhy(object sender, EventArgs e) => ShowWhy();

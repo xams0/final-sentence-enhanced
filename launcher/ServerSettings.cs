@@ -99,7 +99,7 @@ namespace Lanppart3Launcher
             .Replace('\u2019', '\'').Replace('\u2018', '\'').Replace('\u201C', '"').Replace('\u201D', '"')
             .Replace("\u2026", "...").Replace('\u00A0', ' ').Replace('\u202F', ' ').Replace('\u2013', '-').Replace('\u2014', '-');
 
-        static string LuaString(string s) =>
+        internal static string LuaString(string s) =>
             "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n") + "\"";
 
         static string LuaLongString(string s)

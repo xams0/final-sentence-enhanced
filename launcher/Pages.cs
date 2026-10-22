@@ -10,7 +10,7 @@ namespace Lanppart3Launcher
     // The launcher's pages: dedicated servers, server browser, custom texts.
     public partial class MainWindow
     {
-        enum Page { None, Servers, Browser, Texts }
+        enum Page { None, Servers, Browser, Texts, Presets }
 
         static readonly string[] ModeNames = { "Battle royale", "K.O.", "Duel" };
         static readonly string[] Difficulties = { "Très facile", "Facile", "Moyen", "Difficile", "Expert" };
@@ -154,56 +154,62 @@ namespace Lanppart3Launcher
                    (catalog.Count == 0 && s.Texts != TextSource.CustomTexts
                        ? " La liste des textes du jeu apparaît après un premier lancement en mode Lanppart3 ou d'un serveur." : ""));
 
+            BuildRules(o, s, () => SaveSettings(server), rebuild);
+        }
+
+        // Bots, mistakes, roulette or lives, durations: the rules of a server or of a lobby preset.
+        void BuildRules(OptionsBuilder o, ServerSettings s, Action save, Action rebuild)
+        {
             o.Section("Bots");
             int capacity = ServerSettings.Capacity(s.Mode);
             var botsMode = o.Row("Bots", OptionsBuilder.Combo(new[] { "Compléter les places", "Nombre fixe" }, s.FillWithBots ? 0 : 1));
-            botsMode.SelectionChanged += (x, e) => { s.FillWithBots = botsMode.SelectedIndex == 0; SaveSettings(server); rebuild(); };
+            botsMode.SelectionChanged += (x, e) => { s.FillWithBots = botsMode.SelectedIndex == 0; save(); rebuild(); };
             if (!s.FillWithBots)
             {
                 var bots = o.Row("Nombre de bots", new Stepper(Math.Min(s.Bots, capacity - 1), 0, capacity - 1));
-                bots.ValueChanged += v => { s.Bots = v; SaveSettings(server); };
+                bots.ValueChanged += v => { s.Bots = v; save(); };
             }
             var diff = o.Row("Difficulté des bots", OptionsBuilder.Combo(Difficulties, s.BotsDifficulty));
-            diff.SelectionChanged += (x, e) => { s.BotsDifficulty = diff.SelectedIndex; SaveSettings(server); };
+            diff.SelectionChanged += (x, e) => { s.BotsDifficulty = diff.SelectedIndex; save(); };
             o.Note(s.FillWithBots ? "Au lancement, les places libres (" + capacity + " au total) sont prises par des bots."
                                   : "Places : " + capacity + " au total.");
 
             o.Section("Fautes");
             var behaviour = o.Row("Après une faute", OptionsBuilder.Combo(MistakeBehaviours, s.MistakeBehaviour));
-            behaviour.SelectionChanged += (x, e) => { s.MistakeBehaviour = behaviour.SelectedIndex; SaveSettings(server); };
+            behaviour.SelectionChanged += (x, e) => { s.MistakeBehaviour = behaviour.SelectedIndex; save(); };
             var caps = o.Row("MAJ prises en compte", OptionsBuilder.Check(s.CapitalsMatter));
-            caps.Click += (x, e) => { s.CapitalsMatter = caps.IsChecked == true; SaveSettings(server); };
+            caps.Click += (x, e) => { s.CapitalsMatter = caps.IsChecked == true; save(); };
             if (s.Mode == GameMode.BattleRoyale)
             {
                 var mistakes = o.Row("Fautes max. par manche", new Stepper(s.MaxMistakesPerRound, 1, 10),
                                      "Atteindre ce nombre de fautes dans une manche déclenche la roulette (ou coûte une vie).");
-                mistakes.ValueChanged += v => { s.MaxMistakesPerRound = v; SaveSettings(server); };
+                mistakes.ValueChanged += v => { s.MaxMistakesPerRound = v; save(); };
             }
 
             o.Section("Roulette");
             var roulette = o.Row("Jouer à la roulette russe", OptionsBuilder.Check(s.Roulette));
-            roulette.Click += (x, e) => { s.Roulette = roulette.IsChecked == true; SaveSettings(server); rebuild(); };
+            roulette.Click += (x, e) => { s.Roulette = roulette.IsChecked == true; save(); rebuild(); };
             if (s.Roulette)
             {
                 var slots = o.Row("Coups du barillet", new Stepper(s.BulletSlots, 1, 6));
                 var initial = o.Row("Balles initiales", new Stepper(Math.Min(s.InitialBullets, s.BulletSlots - 1), 0, s.BulletSlots - 1));
-                slots.ValueChanged += v => { s.BulletSlots = v; initial.Max = v - 1; initial.Value = initial.Value; SaveSettings(server); };
-                initial.ValueChanged += v => { s.InitialBullets = v; SaveSettings(server); };
+                slots.ValueChanged += v => { s.BulletSlots = v; initial.Max = v - 1; initial.Value = initial.Value; save(); };
+                initial.ValueChanged += v => { s.InitialBullets = v; save(); };
             }
             else
             {
                 var lives = o.Row("Vies", new Stepper(s.Lives, 1, 6),
                                   "Chaque fois que le jeu déclencherait la roulette ou une élimination, le joueur perd une vie.");
-                lives.ValueChanged += v => { s.Lives = v; SaveSettings(server); };
+                lives.ValueChanged += v => { s.Lives = v; save(); };
             }
 
             o.Section("Durée");
             var round = o.Row("Durée de la manche", new Stepper(s.RoundDuration, 30, 900, 10, Stepper.Duration));
-            round.ValueChanged += v => { s.RoundDuration = v; SaveSettings(server); };
+            round.ValueChanged += v => { s.RoundDuration = v; save(); };
             if (s.Mode == GameMode.BattleRoyale)
             {
                 var pause = o.Row("Durée de la pause", new Stepper(s.PauseDuration, 0, 60, 5, Stepper.Duration));
-                pause.ValueChanged += v => { s.PauseDuration = v; SaveSettings(server); };
+                pause.ValueChanged += v => { s.PauseDuration = v; save(); };
             }
         }
 
@@ -400,6 +406,83 @@ namespace Lanppart3Launcher
             if (address == null) { StatusText.Text = "Entrez l'adresse du serveur (IP:port)."; return; }
             bool lives = info != null && !info.Roulette;
             Launch(true, address, lives);
+        }
+
+        // ---------------------------------------------------------------- Lobby presets
+
+        int selectedPreset;
+
+        void OnShowPresets(object sender, RoutedEventArgs e) => ShowPresetsPage();
+
+        void OnPointPresets(object sender, EventArgs e) => ShowInfo("Presets Lanppart",
+            "« Lanppart Poules » et « Lanppart Finales » apparaissent dans « Mode de jeu » quand on crée une partie " +
+            "(lobby) en mode Lanppart3. Réglez ici toutes leurs règles : mode, roulette ou vies, bots, fautes, durées.\n\n" +
+            "Le jeu les relit à chaque lancement : après un changement, relancez le jeu. Choisir un preset dans le jeu " +
+            "remplit la fenêtre avec ses règles et les verrouille. Ce sont les presets de l'hôte du lobby qui comptent.");
+
+        void ShowPresetsPage()
+        {
+            var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            var tabs = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
+            for (int i = 0; i < PresetStore.Count; i++)
+            {
+                int index = i;
+                var tab = new Button
+                {
+                    Content = PresetStore.Load(index).Name, FontSize = 16, Margin = new Thickness(0, 0, 14, 0),
+                    Style = StyleRes("PlainButton"), Tag = index == selectedPreset ? "Selected" : null,
+                };
+                tab.Click += (o, a) => { selectedPreset = index; ShowPresetsPage(); };
+                tabs.Children.Add(tab);
+            }
+            root.Children.Add(tabs);
+
+            var body = new Grid();
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
+            Grid.SetRow(body, 1);
+            root.Children.Add(body);
+
+            var form = new StackPanel { Margin = new Thickness(0, 0, 18, 10) };
+            body.Children.Add(new ScrollViewer { Content = form, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+            var preset = PresetStore.Load(selectedPreset);
+            BuildPresetForm(form, preset);
+
+            var side = new StackPanel { Margin = new Thickness(20, 0, 0, 0) };
+            Grid.SetColumn(side, 1);
+            body.Children.Add(side);
+            side.Children.Add(Label(preset.Name, 22, "Cream"));
+            side.Children.Add(Label(ModeNames[(int)preset.Mode] + " · " + (preset.Roulette ? "roulette" : preset.Lives + " vies"),
+                                    15, "OptionLabel", new Thickness(0, 4, 0, 10)));
+            side.Children.Add(Label("Les changements sont enregistrés tout de suite. Le jeu les prend en compte à son prochain " +
+                                    "lancement en mode Lanppart3.", 14, "CreamDim", new Thickness(0, 0, 0, 14)));
+            side.Children.Add(Action("Rétablir par défaut", (o, e) =>
+            {
+                PresetStore.Reset(selectedPreset);
+                StatusText.Text = "Preset « " + PresetStore.Load(selectedPreset).Name + " » rétabli.";
+                ShowPresetsPage();
+            }));
+
+            ShowPage(Page.Presets, "Presets Lanppart", root, null);
+        }
+
+        void BuildPresetForm(StackPanel form, ServerSettings s)
+        {
+            var o = new OptionsBuilder(form);
+            int index = selectedPreset;
+            Action save = () => PresetStore.Save(index, s);
+            Action rebuild = () => { form.Children.Clear(); BuildPresetForm(form, s); };
+
+            o.Section("Preset");
+            var name = o.Row("Nom dans le jeu", OptionsBuilder.Text(s.Name));
+            name.LostFocus += (x, e) => { s.Name = name.Text.Trim().Length > 0 ? name.Text.Trim() : s.Name; save(); };
+            var mode = o.Row("Mode de jeu", OptionsBuilder.Combo(ModeNames, (int)s.Mode));
+            mode.SelectionChanged += (x, e) => { s.Mode = (GameMode)mode.SelectedIndex; save(); rebuild(); };
+            o.Note("Les textes à taper restent ceux choisis dans la fenêtre du jeu (Sélection des textes).");
+            BuildRules(o, s, save, rebuild);
         }
 
         // ---------------------------------------------------------------- Custom texts

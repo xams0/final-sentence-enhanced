@@ -44,6 +44,7 @@ Le lanceur
 ----------
 - Mode normal : le jeu original, serveurs officiels (parties rapides, classement, ligues...).
 - Mode Lanppart3 : le jeu avec le mod (lobbys hébergés par l'hôte).
+- Presets Lanppart : les règles des presets Lanppart Poules et Lanppart Finales du jeu.
 - Rejoindre un serveur : liste des serveurs Lanppart3 du réseau local et de Radmin VPN ; cliquer
   "Rejoindre" lance le jeu et s'y connecte. Ou taper l'adresse IP:port du serveur.
 - Héberger un serveur : créer, régler, démarrer et piloter des serveurs dédiés.
@@ -73,8 +74,14 @@ Jouer avec un lobby
 1. Tout le monde lance le jeu en mode Lanppart3.
 2. L'hôte ouvre "Partie personnalisée", choisit le mode et les règles, puis "Créer".
 3. Les autres rejoignent le lobby (invitation Steam ou code), puis tout le monde clique "Prêt(e)".
-Décocher "Jouer à la roulette russe" fait apparaître la ligne "Vies". Presets : Lanppart Poules
-(Battle royale sans bots) et Lanppart Finales (Duel avec vies).
+Décocher "Jouer à la roulette russe" fait apparaître la ligne "Vies".
+
+Presets Lanppart Poules et Lanppart Finales (dans "Mode de jeu") : leurs règles se règlent dans le
+lanceur, page "Presets Lanppart" (nom, mode, roulette ou vies, bots, fautes, durées). Le jeu les relit à
+chaque lancement : après un changement, relancer le jeu. Choisir un preset remplit la fenêtre avec ses
+règles et les verrouille ; vos propres réglages des modes Battle royale / K.O. / Duel restent intacts.
+Ce sont les presets de l'hôte du lobby qui comptent. Par défaut : Poules = Battle royale, 3 vies, sans
+bots ; Finales = Duel, 3 vies.
 
 Bon à savoir
 ------------

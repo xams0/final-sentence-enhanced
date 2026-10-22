@@ -11,11 +11,13 @@ local GI_STATE_MAINMENU = 2
 local READY_MARKER = -777
 local PORT = 7777
 local MODE_NAMES = { [0] = "Battle Royale", [1] = "K.O.", [2] = "Duel" }
+local PERSISTENT_HUD = "/Game/TheEnd/ui/interfaces/common/wbp_hud_persistent.wbp_hud_persistent_C"
 
 local launched = false     -- this lobby launch was handled
 local markerPending = false
 local matchmakingShown = false  -- hidden at launch: hide again once in game
 local matchmakingHidden = false
+local lastMembers, lastCapacity = nil, nil  -- the lobby window's last "n/m"
 
 local function Subsystem()
     local lobby = FindFirstOf("PGSteamLobbySubsystem")
@@ -60,10 +62,14 @@ end
 
 -- Members in the lobby and its size, as the lobby window shows them ("2/8").
 local function MemberCounts()
-    local window = FindFirstOf("wbp_mainmenu_window_lobby_inlobby_C")
-    if not (window and window:IsValid()) then return nil end
-    local members, capacity = window.LobbyMemberCounter:GetText():ToString():match("(%d+)%s*/%s*(%d+)")
-    return tonumber(members), tonumber(capacity)
+    -- (FindFirstOf may return the class' template, whose counter is empty.)
+    for _, window in ipairs(FindAllOf("wbp_mainmenu_window_lobby_inlobby_C") or {}) do
+        if window:IsValid() and window.LobbyMemberCounter:IsValid() then
+            local members, capacity = window.LobbyMemberCounter:GetText():ToString():match("(%d+)%s*/%s*(%d+)")
+            if members then return tonumber(members), tonumber(capacity) end
+        end
+    end
+    return nil
 end
 
 local function Describe(opts)
@@ -82,8 +88,22 @@ Host.OnServerReady = function()
     end
 end
 
+-- The game shows its matchmaking screen again each time the lobby's options change while it is launched
+-- (the host's ready marker does): a lobby game never waits for the official servers, hide it at once.
+local showHooked = false
+
+local function HookMatchmakingScreen()
+    if showHooked then return end
+    showHooked = true
+    RegisterHook(PERSISTENT_HUD .. ":BP_ShowMatchmakingVisual", function()
+        local lobby = Subsystem()
+        if lobby and lobby:IsLocalPlayerInLobby() then HideMatchmaking() end
+    end)
+end
+
 -- Called periodically on the game thread.
 function Lobby.Tick(gi)
+    if FindFirstOf("wbp_hud_persistent_C") then HookMatchmakingScreen() end
     local lobby = Subsystem()
     if not (lobby and lobby:IsLocalPlayerInLobby()) then
         launched = false
@@ -108,6 +128,9 @@ function Lobby.Tick(gi)
         matchmakingHidden = false
     end
 
+    -- The lobby window may be gone by the time the lobby launches: remember its counter.
+    local m, c = MemberCounts()
+    if m then lastMembers, lastCapacity = m, c end
     if IsHost(lobby) then
         -- Back from the session: the game ended the lobby's matchmaking state.
         if not lobby:IsLobbyInMatchmaking() then
@@ -119,6 +142,7 @@ function Lobby.Tick(gi)
             launched = true
             markerPending = true
             local members, capacity = MemberCounts()
+            if not members then members, capacity = lastMembers, lastCapacity end
             print(string.format("[Lanppart] lobby launched: hosting %s, %s/%s players\n", Describe(opts),
                 tostring(members), tostring(capacity)))
             if not Host.Start(Host.SessionOptions(opts, members, capacity)) then markerPending = false end

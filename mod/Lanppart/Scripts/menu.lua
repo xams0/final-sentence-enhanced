@@ -169,7 +169,8 @@ Adjust = function(w)
     if finales and roulette.CheckBoxBtn:IsChecked() then roulette.CheckBoxBtn:SetIsChecked(false) end
     SetEnabled(roulette, editable and not finales)
     local withRoulette = roulette.CheckBoxBtn:IsChecked()
-    local changed = state.Roulette ~= withRoulette
+    -- Unchecked by the player just now (not on opening: the saved lives stay).
+    local changed = state.Roulette ~= nil and state.Roulette ~= withRoulette
     state.Roulette = withRoulette  -- before the steppers below call back into Refresh
 
     local slots, initial, mistakes = w.BulletSlotsStepper, w.InitialBulletsStepper, w.MaxMistakesPerRoundStepper
@@ -190,10 +191,10 @@ Adjust = function(w)
         -- The lives as hearts, where the drum was.
         if not state.Hearts then
             -- On the stepper's line: [-] value [+] hearts.
-            state.Hearts = Hearts.NewRow(w.WidgetTree, 24)
+            state.Hearts = Hearts.NewRow(w.WidgetTree, 20)
             local slot = slots.IncrementButton:GetParent():AddChildToHorizontalBox(state.Hearts)
             slot:SetVerticalAlignment(VALIGN_CENTER)
-            slot:SetPadding({ Left = 24, Top = 0, Right = 0, Bottom = 0 })
+            slot:SetPadding({ Left = 16, Top = 0, Right = 0, Bottom = 0 })
         end
         Hearts.Show(state.Hearts, true)
         Hearts.Set(state.Hearts, slots.Stepper, slots.Stepper)

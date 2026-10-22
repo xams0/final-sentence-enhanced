@@ -199,8 +199,42 @@ local function ShowWaiting(gs)
     if waitLabel:GetVisibility() ~= wanted then waitLabel:SetVisibility(wanted) end
 end
 
+-- A writer's camera is their own pawn while they wait or type. A client loading slowly may get its pawn
+-- before its camera manager: the camera retarget is then skipped (lanppart_native.c, remote controller
+-- camera patch) and the view stayed on the room's default, overhead camera for the whole game. Put it back
+-- when it is off the pawn for a while in those states (other states have their own cameras: roulette,
+-- execution, death...).
+local CAMERA_STATES = { [1] = true, [2] = true, [3] = true, [4] = true }  -- Waiting, Typing, Rewinding, Await
+local CAMERA_PATIENCE = 3  -- ticks (0.5 s each) off the pawn before the view is put back
+local cameraOff = 0
+
+local function KeepCameraOnWriter()
+    local pc
+    for _, c in ipairs(FindAllOf("PlayerController") or {}) do
+        if c:IsValid() and c:IsLocalController() then pc = c break end
+    end
+    local pawn = pc and pc.Pawn
+    local ps = pc and pc.PlayerState
+    if not (Valid(pawn) and Valid(ps) and Valid(pc.PlayerCameraManager) and ps:IsA("/Script/TheEnd.PGGameplayPlayerState")
+            and CAMERA_STATES[ps.WriterState]) then
+        cameraOff = 0
+        return
+    end
+    local view = pc:GetViewTarget()
+    if Valid(view) and view:GetAddress() == pawn:GetAddress() then
+        cameraOff = 0
+        return
+    end
+    cameraOff = cameraOff + 1
+    if cameraOff < CAMERA_PATIENCE then return end
+    cameraOff = 0
+    print("[Lanppart] camera was off the writer: back on it\n")
+    pc:SetViewTargetWithBlend(pawn, 0.0, 0, 0.0, false)
+end
+
 -- Called periodically on the game thread.
 function Hud.Tick()
+    KeepCameraOnWriter()
     ShowModLabel()
     HookBullets()
     ShowWaiting(FindFirstOf("PGGameplayGameState"))

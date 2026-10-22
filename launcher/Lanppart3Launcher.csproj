@@ -11,7 +11,7 @@
     <RootNamespace>Lanppart3Launcher</RootNamespace>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>3.2.2</Version>
+    <Version>3.2.3</Version>
     <Product>Lanppart3 Final Sentence</Product>
     <Description>Lanceur Final Sentence : mode normal ou mode Lanppart3</Description>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>

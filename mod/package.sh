@@ -45,4 +45,8 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 cp "$ROOT/launcher/bin/Release/net48/Lanppart3 Final Sentence.exe" "$OUT/$EXE"
 cp "$ROOT/mod/LISEZMOI.txt" "$OUT/"
+# Shortcut to the fresh launcher at the project's root (local only, not versioned).
+powershell -NoProfile -Command "\$s = (New-Object -ComObject WScript.Shell).CreateShortcut('$(cygpath -w "$ROOT/Lanppart3 Final Sentence.lnk")'); \
+  \$s.TargetPath = '$(cygpath -w "$OUT/$EXE")'; \$s.WorkingDirectory = '$(cygpath -w "$OUT")'; \
+  \$s.IconLocation = '$(cygpath -w "$OUT/$EXE"),0'; \$s.Description = 'Lanppart3 Final Sentence (dernière version construite)'; \$s.Save()"
 echo "Launcher: $OUT/$EXE"

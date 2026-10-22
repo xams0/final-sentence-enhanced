@@ -11,6 +11,7 @@ local VIS_HIDDEN = 2
 local DUEL_NAME_WIDTH = 520  -- the game's 250 leaves no room for 6 hearts after a long name
 local VALIGN_CENTER = 2
 local BULLETS_WIDGET = "/Game/TheEnd/ui/interfaces/gameplay/tabmenu/wbp_gameplay_tabmenu_bullets.wbp_gameplay_tabmenu_bullets_C"
+local TABMENU_ENTRY = "/Game/TheEnd/ui/interfaces/gameplay/tabmenu/wbp_gameplay_tabmenu_entry.wbp_gameplay_tabmenu_entry_C"
 
 local function Valid(o) return o and o:IsValid() end
 
@@ -78,18 +79,17 @@ local function DuelName(textBlock, hearts, ps)
     return Hearts.Set(hearts, Hearts.LivesOf(ps))
 end
 
--- Scoreboard and match results: the bullets cell of each row shows hearts instead.
+-- Scoreboard (Tab) and match results: the bullets cell of each row shows hearts instead. (In K.O. the
+-- game hides that cell, having no roulette: it is shown again.)
 local bulletRows = {}  -- bullets widget address -> hearts row
+local VIS_HIT_TEST_INVISIBLE = 4
 
 local function SessionLives()
     local gs = FindFirstOf("PGGameplayGameState")
     return Valid(gs) and gs.GameplayOptions.BulletSlotsNum or nil
 end
 
-local function OnBulletsUpdated(widget)
-    if not Host.LivesMode then return end
-    local total = SessionLives()
-    if not total then return end
+local function ShowHearts(widget, lives, total)
     local key = widget:GetAddress()
     local row = bulletRows[key]
     if not Valid(row) then
@@ -98,18 +98,48 @@ local function OnBulletsUpdated(widget)
         bulletRows[key] = row
     end
     for i = 0, 5 do Hide(widget["Bullet" .. i]) end
-    Hearts.Set(row, total - widget.Bullets, total)
+    for _, w in ipairs({ widget, widget:GetParent() }) do
+        if Valid(w) and w:GetVisibility() ~= VIS_HIT_TEST_INVISIBLE then w:SetVisibility(VIS_HIT_TEST_INVISIBLE) end
+    end
+    Hearts.Set(row, lives, total)
 end
 
-local bulletsHooked = false
+-- Match results: from the row's bullets (lost lives). (The scoreboard's rows are handled below.)
+local function OnBulletsUpdated(widget)
+    if not Host.LivesMode or widget:GetFullName():find("tabmenu_entry", 1, true) then return end
+    local total = SessionLives()
+    if total then ShowHearts(widget, total - widget.Bullets, total) end
+end
+
+-- Scoreboard: from the row's player; an empty row shows nothing.
+local function OnEntryUpdated(entry, ps)
+    if not (Host.LivesMode and Valid(entry.wbp_gameplay_tabmenu_bullets)) then return end
+    if Valid(ps) then
+        ShowHearts(entry.wbp_gameplay_tabmenu_bullets, Hearts.LivesOf(ps))
+    else
+        Hide(entry.wbp_gameplay_tabmenu_bullets)
+    end
+end
+
+local bulletsHooked, entriesHooked = false, false
+
+local function Guarded(fn)
+    return function(...)
+        local ok, err = pcall(fn, ...)
+        if not ok then print("[Lanppart] hearts: " .. tostring(err) .. "\n") end
+    end
+end
 
 local function HookBullets()
-    if bulletsHooked or not Valid(StaticFindObject(BULLETS_WIDGET)) then return end
-    bulletsHooked = true
-    RegisterHook(BULLETS_WIDGET .. ":UpdateWidget", function(self)
-        local ok, err = pcall(OnBulletsUpdated, self:get())
-        if not ok then print("[Lanppart] hearts: " .. tostring(err) .. "\n") end
-    end)
+    if not bulletsHooked and Valid(StaticFindObject(BULLETS_WIDGET)) then
+        bulletsHooked = true
+        RegisterHook(BULLETS_WIDGET .. ":UpdateWidget", Guarded(function(self) OnBulletsUpdated(self:get()) end))
+    end
+    if not entriesHooked and Valid(StaticFindObject(TABMENU_ENTRY)) then
+        entriesHooked = true
+        RegisterHook(TABMENU_ENTRY .. ":UpdateWidget", Guarded(function(self, ps) OnEntryUpdated(self:get(), ps:get()) end))
+        RegisterHook(TABMENU_ENTRY .. ":InitiateEmptyEntry", Guarded(function(self) OnEntryUpdated(self:get(), nil) end))
+    end
 end
 
 -- On a dedicated server, the players wait in the room until the organizer clicks "Lancer la partie".

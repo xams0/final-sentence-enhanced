@@ -13,7 +13,7 @@ ZIG="${ZIG:-$ROOT/_work/dl/zig-x86_64-windows-0.17.0/zig.exe}"
 DOTNET="${DOTNET:-/c/Program Files/dotnet/dotnet.exe}"
 BUILD="$ROOT/build"
 PAYLOAD="$BUILD/payload"
-OUT="$ROOT/dist"
+OUT="${DIST_DIR:-$ROOT/dist}"  # (another folder while the launcher in dist/ is running)
 EXE="Lanppart3-Final-Sentence.exe"
 
 mkdir -p "$BUILD"
@@ -45,8 +45,10 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 cp "$ROOT/launcher/bin/Release/net48/Lanppart3 Final Sentence.exe" "$OUT/$EXE"
 cp "$ROOT/mod/LISEZMOI.txt" "$OUT/"
-# Shortcut to the fresh launcher at the project's root (local only, not versioned).
-powershell -NoProfile -Command "\$s = (New-Object -ComObject WScript.Shell).CreateShortcut('$(cygpath -w "$ROOT/Lanppart3 Final Sentence.lnk")'); \
-  \$s.TargetPath = '$(cygpath -w "$OUT/$EXE")'; \$s.WorkingDirectory = '$(cygpath -w "$OUT")'; \
-  \$s.IconLocation = '$(cygpath -w "$OUT/$EXE"),0'; \$s.Description = 'Lanppart3 Final Sentence (dernière version construite)'; \$s.Save()"
+if [ -z "$DIST_DIR" ]; then
+  # Shortcut to the fresh launcher at the project's root (local only, not versioned).
+  powershell -NoProfile -Command "\$s = (New-Object -ComObject WScript.Shell).CreateShortcut('$(cygpath -w "$ROOT/Lanppart3 Final Sentence.lnk")'); \
+    \$s.TargetPath = '$(cygpath -w "$OUT/$EXE")'; \$s.WorkingDirectory = '$(cygpath -w "$OUT")'; \
+    \$s.IconLocation = '$(cygpath -w "$OUT/$EXE"),0'; \$s.Description = 'Lanppart3 Final Sentence (dernière version construite)'; \$s.Save()"
+fi
 echo "Launcher: $OUT/$EXE"

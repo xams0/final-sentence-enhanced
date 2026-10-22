@@ -6,7 +6,7 @@ set -e
 trap 'echo "release.sh: failed at line $LINENO" >&2' ERR
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="xams0/final-sentence-enhanced"
-ASSET="$ROOT/dist/Lanppart3-Final-Sentence.exe"
+ASSET="${ASSET:-$ROOT/dist/Lanppart3-Final-Sentence.exe}"
 VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$ROOT/launcher/Lanppart3Launcher.csproj")
 TAG="v$VERSION"
 NOTES="${1:-Lanppart3 $TAG}"

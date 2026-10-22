@@ -574,7 +574,8 @@ namespace Lanppart3Launcher
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 };
                 editor.Children.Add(body);
-                o.Note("Une ligne par vers. Une ligne contenant seulement *** sépare deux manches.");
+                o.Note("Une ligne contenant seulement *** sépare deux manches. Les lignes de plus de 48 caractères sont " +
+                       "coupées automatiquement entre deux mots, comme celles des textes du jeu.");
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(18, 6, 0, 0) };
                 buttons.Children.Add(Action("Enregistrer", (x, e) =>
                 {

@@ -61,12 +61,53 @@ end
 -- replicated to the players, who never see it before the game starts.
 local custom = {}
 
+-- The typewriter only returns at the text's line breaks and the screen has room for about 50 characters:
+-- the game's own lines are short (99% at most 49 characters). Longer lines are cut between words.
+local MAX_LINE = 48
+
+local function Wrap(line)
+    if utf8.len(line) == nil or utf8.len(line) <= MAX_LINE then return { line } end
+    local lines, current = {}, ""
+    for word in line:gmatch("%S+") do
+        while utf8.len(word) > MAX_LINE do  -- (a word longer than a line: cut it)
+            if current ~= "" then lines[#lines + 1] = current current = "" end
+            local cut = utf8.offset(word, MAX_LINE + 1)
+            lines[#lines + 1] = word:sub(1, cut - 1)
+            word = word:sub(cut)
+        end
+        if current == "" then
+            current = word
+        elseif utf8.len(current) + 1 + utf8.len(word) <= MAX_LINE then
+            current = current .. " " .. word
+        else
+            lines[#lines + 1] = current
+            current = word
+        end
+    end
+    if current ~= "" then lines[#lines + 1] = current end
+    return lines
+end
+
+-- Game format: CRLF lines of at most MAX_LINE characters, rounds separated by a "***" line.
+local function GameFormat(body)
+    local out = {}
+    for line in (body:gsub("\r\n", "\n") .. "\n"):gmatch("([^\n]*)\n") do
+        line = line:gsub("%s+$", "")
+        if line == "" then
+            -- (blank lines would be lines to type: dropped)
+        else
+            for _, l in ipairs(Wrap(line)) do out[#out + 1] = l end
+        end
+    end
+    return table.concat(out, "\r\n")
+end
+Texts.GameFormat = GameFormat
+
 -- texts: list of { Id, Title, Body, Difficulty } (Body: rounds separated by a "***" line).
 function Texts.SetCustom(texts)
     custom = {}
     for _, t in ipairs(texts or {}) do
-        -- The game's own texts: CRLF lines, rounds separated by a "***" line.
-        local body = t.Body:gsub("\r\n", "\n"):gsub("\n", "\r\n")
+        local body = GameFormat(t.Body)
         custom[t.Id] = { Text = body, Id = t.Id, Difficulty = t.Difficulty or 1, Title = t.Title }
     end
 end

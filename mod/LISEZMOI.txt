@@ -53,7 +53,8 @@ Le lanceur
 - Rejoindre un serveur : liste des serveurs Lanppart3 du réseau local et de Radmin VPN ; cliquer
   "Rejoindre" lance le jeu et s'y connecte. Ou taper l'adresse IP:port du serveur.
 - Héberger un serveur : créer, régler, démarrer et piloter des serveurs dédiés.
-- Textes personnalisés : écrire ses textes (une ligne *** sépare deux manches). Les apostrophes et
+- Textes personnalisés : écrire ses textes (une ligne *** sépare deux manches ; les lignes de plus de
+  48 caractères sont coupées entre deux mots, comme celles du jeu). Les apostrophes et
   guillemets typographiques (’ “ ” …) sont remplacés par ceux du clavier (' " ...).
 "Lanppart3 Mod v3.x" s'affiche en bas à gauche de l'écran quand le mod est actif.
 Dans le jeu, "Serveurs LAN" (menu principal, Groupe) liste les serveurs : cliquer sur le nom d'un serveur

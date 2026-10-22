@@ -10,6 +10,29 @@ aux règles libres, en LAN ou via Radmin VPN.
 - **Textes personnalisés** gardés sur le serveur : les joueurs les découvrent en jouant.
 - **Liste des serveurs** du réseau local dans le lanceur et dans le jeu.
 
+## Aperçu
+
+| Lanceur : héberger un serveur | Lanceur : presets Lanppart |
+| --- | --- |
+| ![Héberger un serveur avec le preset Lanppart Finales](docs/images/lanceur-serveur.jpg) | ![Page Presets Lanppart](docs/images/lanceur-presets.jpg) |
+
+| Dans le jeu : serveurs LAN | En attente de l'organisateur |
+| --- | --- |
+| ![Liste des serveurs dans le jeu : on clique sur le nom](docs/images/jeu-serveurs-lan.jpg) | ![Message d'attente avant le lancement](docs/images/jeu-attente.jpg) |
+
+| K.O. avec vies (Lanppart Finales) | Création de partie avec un preset |
+| --- | --- |
+| ![Partie K.O. avec les vies en cœurs](docs/images/jeu-ko-coeurs.jpg) | ![Preset Lanppart Poules dans la fenêtre du jeu, règles verrouillées](docs/images/jeu-preset-lobby.jpg) |
+
+Les vies en cœurs, dans le classement (Tab) et sur la ligne « Vies » :
+
+![Cœurs dans le classement](docs/images/jeu-classement-coeurs.jpg)
+![Cœurs sur la ligne Vies](docs/images/jeu-ligne-vies.jpg)
+
+Un lanceur périmé ne lance pas le jeu : il propose d'abord la mise à jour.
+
+![Mise à jour disponible](docs/images/lanceur-mise-a-jour.jpg)
+
 ## Installation
 
 Télécharger `Lanppart3-Final-Sentence.exe` dans les
@@ -31,7 +54,8 @@ Mode d'emploi complet : [mod/LISEZMOI.txt](mod/LISEZMOI.txt).
 | `native/` | DLL native du mod (serveur d'écoute, Iris, vies, serveurs dédiés) |
 | `mod/package.sh` | Construit `dist/Lanppart3-Final-Sentence.exe` |
 | `mod/deploy.sh`, `mod/dev/` | Outils de développement |
-| `tools/` | Images des cœurs, publication d'une version |
+| `tools/` | Images des cœurs, captures (JPEG), publication d'une version |
+| `docs/images/` | Captures d'écran du README |
 
 ## Construire
 

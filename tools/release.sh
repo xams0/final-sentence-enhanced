@@ -3,6 +3,7 @@
 # v<version of launcher/Lanppart3Launcher.csproj>. The launchers already installed then offer the update.
 # Uses the GitHub credentials stored for git (Git Credential Manager). Usage: tools/release.sh ["notes"]
 set -e
+trap 'echo "release.sh: failed at line $LINENO" >&2' ERR
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="xams0/final-sentence-enhanced"
 ASSET="$ROOT/dist/Lanppart3-Final-Sentence.exe"

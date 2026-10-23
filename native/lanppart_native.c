@@ -344,6 +344,7 @@ static int PatchGameNetModeCalls(void) {
 // Without lives, K.O. sessions with the roulette checked spin the roulette instead of knocking out.
 typedef void (*StartRoulette_t)(void* gs, void* ps, float delay, float duration);
 typedef void (*ExecuteWriter_t)(void* gs, void* ps, float delay, uint8_t result);
+typedef void (*WinMatch_t)(void* gs, void* ps, char fromRoulette);
 typedef void (*AdvanceRound_t)(void* gs, void* ps, char fromRoulette);
 typedef void (*MoveCarriage_t)(void* ps, int32_t delta, int32_t target);
 typedef void (*LoadChamber_t)(void* ps, char spin);
@@ -360,6 +361,8 @@ typedef double (*GetServerTime_t)(void* gs);
 #define RVA_BR_SKIP_ROULETTE_CALL  0x42E5774  // ... too close to the round end: Execute(PS, SkipRouletteToExecute)
 #define RVA_BR_SKIP_REWIND_CALL    0x42E578B  // rewind would pass the round end: Execute(PS, SkipRewindToExecute)
 #define RVA_KO_KNOCKDOWN_CALL      0x42CDFA3  // K.O. round end: Execute(last writer, Knockdown)
+#define RVA_KO_FINAL_CHECK         0x42CDF50  // ... cmp [gs+478h], 2 / je WinMatch: two writers left, no knockdown
+#define RVA_WIN_MATCH              0x42E5C50  // GameState: the writer wins, every other one is executed
 #define RVA_RESET_ROUND_MISTAKES   0x42FA980  // PlayerState: clear the round's typing/mistake state
 #define RVA_SET_WRITER_STATE       0x42FC0E0  // PlayerState: SetWriterState(EPGWriterState)
 #define RVA_BOTPC_STATICCLASS      0x4287BF0  // bot controller StaticClass
@@ -379,6 +382,7 @@ typedef double (*GetServerTime_t)(void* gs);
 #define WS_Typing   2
 #define WS_Await    4
 #define WS_Roulette 6
+#define WS_Executed 7
 #define WS_Dead     8
 #define RESULT_RoundTimeout          2
 #define RESULT_SkipRouletteToExecute 4
@@ -537,9 +541,43 @@ static void OnRoundLost(uint8_t* gs, uint8_t* ps, float delay, uint8_t result) {
     LoseLife(gs, ps, delay, result, 1);
 }
 
+// K.O. with two writers left: the game knocks nobody out, the first to finish the round wins and the other
+// is executed, lives left or not. With lives, the count it checks becomes one K.O. never reaches (127):
+// the slower writer is knocked out (loses a life) as with more writers. OnKnockdown ends the match.
+static uint8_t* g_koFinalCount;  // the check's imm8
+
+static int PatchKnockdownFinal(void) {
+    static const uint8_t expected[] = { 0x83, 0xBD, 0x78, 0x04, 0x00, 0x00, 0x02, 0x0F, 0x84 };
+    uint8_t* at = AT(RVA_KO_FINAL_CHECK);
+    if (memcmp(at, expected, sizeof(expected)) != 0) {
+        Log("K.O. final: refused, unexpected bytes");
+        return 0;
+    }
+    g_koFinalCount = at + 6;
+    Log("K.O. final: installed");
+    return 1;
+}
+
+static void SetKnockdownFinal(int lives) {
+    uint8_t count = lives ? 0x7F : 0x02;
+    if (g_koFinalCount && *g_koFinalCount != count) WriteCode(g_koFinalCount, &count, 1);
+}
+
 // K.O.: the last writer of a round is knocked out.
 static void OnKnockdown(uint8_t* gs, uint8_t* ps, float delay, uint8_t result) {
-    if (LivesActive(gs)) { LoseLife(gs, ps, delay, result, 1); return; }
+    if (LivesActive(gs)) {
+        LoseLife(gs, ps, delay, result, 1);
+        // One of the last two writers lost their last life: the other wins, as in the game's final.
+        TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+        if (!ps || ps[OFF_PS_WRITERSTATE] != WS_Executed || players->Num != 2) return;
+        for (int32_t i = 0; i < players->Num; i++) {
+            uint8_t* other = ((uint8_t**)players->Data)[i];
+            if (!other || other == ps) continue;
+            Log("K.O. final: writer %d wins", *(int32_t*)(other + OFF_PS_WRITERID));
+            ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, other, 0);
+        }
+        return;
+    }
     if (IsServer(gs) && gs[OFF_GS_OPTIONS + OPT_PLAYROULETTE]) {
         ((StartRoulette_t)AT(RVA_START_ROULETTE))(gs, ps, delay, RouletteDuration());
         return;
@@ -936,6 +974,8 @@ static int Install(void) {
     if (!PatchNetMode()) return 0;
     if (!PatchGameNetModeCalls()) return 0;
     if (!PatchLives()) return 0;
+    if (!PatchKnockdownFinal()) return 0;
+    SetKnockdownFinal(g_livesMode);
     if (!PatchRemoteControllerCamera()) return 0;
     if (!PatchWriterPlayerState()) return 0;
     if (!getenv("LANPPART3_DEV_NO_VOICE_PATCH")) PatchVoiceWithoutLocalPlayer();  // (dedicated servers need it; not fatal)
@@ -1282,6 +1322,7 @@ __declspec(dllexport) int lanppart_server_start(void* L) {
 __declspec(dllexport) int lanppart_lives_on(void* L) {
     (void)L;
     g_livesMode = 1;
+    SetKnockdownFinal(1);
     Log("Lives mode on");
     return 0;
 }
@@ -1289,6 +1330,7 @@ __declspec(dllexport) int lanppart_lives_on(void* L) {
 __declspec(dllexport) int lanppart_lives_off(void* L) {
     (void)L;
     g_livesMode = 0;
+    SetKnockdownFinal(0);
     return 0;
 }
 

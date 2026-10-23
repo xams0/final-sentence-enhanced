@@ -48,13 +48,11 @@ local function LoadSettings()
     return true
 end
 
--- The configured texts (ids).
+-- The configured texts (ids): the game texts and the custom texts the launcher wrote (only the chosen ones).
 local function Pool()
     local pool = {}
     for _, id in ipairs(settings.TextIds or {}) do pool[#pool + 1] = id end
-    for _, t in ipairs(settings.Texts or {}) do
-        if settings.TextIds == nil or #settings.TextIds == 0 or settings.UseCustomTexts then pool[#pool + 1] = t.Id end
-    end
+    for _, t in ipairs(settings.Texts or {}) do pool[#pool + 1] = t.Id end
     if #pool == 0 then
         local _, saved = Texts.SavedSelection(settings.Mode)
         pool = saved

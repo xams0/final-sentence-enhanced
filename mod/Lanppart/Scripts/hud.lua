@@ -199,42 +199,35 @@ local function ShowWaiting(gs)
     if waitLabel:GetVisibility() ~= wanted then waitLabel:SetVisibility(wanted) end
 end
 
--- A writer's camera is their own pawn while they wait or type. A client loading slowly may get its pawn
--- before its camera manager: the camera retarget is then skipped (lanppart_native.c, remote controller
--- camera patch) and the view stayed on the room's default, overhead camera for the whole game. Put it back
--- when it is off the pawn for a while in those states (other states have their own cameras: roulette,
--- execution, death...).
-local CAMERA_STATES = { [1] = true, [2] = true, [3] = true, [4] = true }  -- Waiting, Typing, Rewinding, Await
-local CAMERA_PATIENCE = 3  -- ticks (0.5 s each) off the pawn before the view is put back
-local cameraOff = 0
+-- A writer's seat is set up when its player state replicates: the player's own seat gets the camera, the
+-- others lose theirs. A player state sometimes comes before its own properties (WriterId -1, no owner):
+-- the player's seat was then set up as an opponent's, without camera, and the view stayed above the seat
+-- for the whole game. The native code postpones such a setup (lanppart_native.c, writers' player state);
+-- run it again once the player state is complete. Clearing the "player state ready" pawn state bit lets
+-- the blueprint see that change again, with the right data this time.
+local PAWN_STATE_PLAYERSTATE_READY = 2
+local SETUP_TRIES = 3
+local setupTries = {}
 
-local function KeepCameraOnWriter()
-    local pc
-    for _, c in ipairs(FindAllOf("PlayerController") or {}) do
-        if c:IsValid() and c:IsLocalController() then pc = c break end
+local function SetUpPostponedWriters()
+    for _, w in ipairs(FindAllOf("PGPlayableWriter") or {}) do
+        local ps = w:IsValid() and w.PlayerState
+        if Valid(ps) and ps:IsA("/Script/TheEnd.PGGameplayPlayerState") and ps.WriterId >= 0
+                and not Valid(w.GameplayPlayerState) then
+            local key = w:GetAddress()
+            setupTries[key] = (setupTries[key] or 0) + 1
+            if setupTries[key] <= SETUP_TRIES then
+                print(string.format("[Lanppart] writer %d: postponed seat setup\n", ps.WriterId))
+                w.PawnState = w.PawnState & ~PAWN_STATE_PLAYERSTATE_READY
+                w:OnRep_PlayerState()
+            end
+        end
     end
-    local pawn = pc and pc.Pawn
-    local ps = pc and pc.PlayerState
-    if not (Valid(pawn) and Valid(ps) and Valid(pc.PlayerCameraManager) and ps:IsA("/Script/TheEnd.PGGameplayPlayerState")
-            and CAMERA_STATES[ps.WriterState]) then
-        cameraOff = 0
-        return
-    end
-    local view = pc:GetViewTarget()
-    if Valid(view) and view:GetAddress() == pawn:GetAddress() then
-        cameraOff = 0
-        return
-    end
-    cameraOff = cameraOff + 1
-    if cameraOff < CAMERA_PATIENCE then return end
-    cameraOff = 0
-    print("[Lanppart] camera was off the writer: back on it\n")
-    pc:SetViewTargetWithBlend(pawn, 0.0, 0, 0.0, false)
 end
 
 -- Called periodically on the game thread.
 function Hud.Tick()
-    KeepCameraOnWriter()
+    SetUpPostponedWriters()
     ShowModLabel()
     HookBullets()
     ShowWaiting(FindFirstOf("PGGameplayGameState"))

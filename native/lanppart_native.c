@@ -744,6 +744,38 @@ static int PatchRemoteControllerCamera(void) {
     return 1;
 }
 
+// ---- Client: writers' player state ----
+// A writer pawn sets up its seat as soon as its PlayerState replicates (ProcessPlayerStateReady): the local
+// player's seat gets the camera, the opponents' seats lose theirs. Iris sometimes delivers the pawn's
+// PlayerState before the player state's own properties: WriterId is still -1 and the owner unknown, so the
+// player's own seat was set up as an opponent's. Its camera destroyed, the view stayed above the seat for
+// the whole game, and no writer was ever the local one. Such a setup is postponed: the Lua tick runs it
+// again once the player state is complete (hud.lua, SetUpPostponedWriters).
+typedef void (*WriterVoid_t)(void* writer);
+#define RVA_WRITER_PLAYERSTATE_READY 0x42FA3A0  // APGPlayableWriter::ProcessPlayerStateReady
+static const uint32_t kWriterPlayerStateReadyCalls[] = {
+    0x42F66AB,  // postponed until the local player controller exists
+    0x42F9BCB,  // OnRep_PlayerState
+    0x42FA183,  // another pawn virtual (its parent's first, then the seat setup)
+};
+#define OFF_PAWN_PLAYERSTATE       0x2C8
+
+static void WriterPlayerStateReady(uint8_t* writer) {
+    uint8_t* ps = *(uint8_t**)(writer + OFF_PAWN_PLAYERSTATE);
+    if (ps && *(int32_t*)(ps + OFF_PS_WRITERID) < 0) {
+        Log("Writer %p: player state not replicated yet, seat setup postponed", writer);
+        return;
+    }
+    ((WriterVoid_t)AT(RVA_WRITER_PLAYERSTATE_READY))(writer);
+}
+
+static int PatchWriterPlayerState(void) {
+    for (size_t i = 0; i < sizeof(kWriterPlayerStateReadyCalls) / sizeof(kWriterPlayerStateReadyCalls[0]); i++)
+        if (!RedirectCall(kWriterPlayerStateReadyCalls[i], RVA_WRITER_PLAYERSTATE_READY,
+                          (void*)&WriterPlayerStateReady, "Writer player state")) return 0;
+    return 1;
+}
+
 // ---- Dedicated server (V2) ----
 // A server instance has no local player: it hosts without playing. Its sessions must wait in
 // WaitingForPlayers until the organizer starts them from the launcher, so the game mode's timers that
@@ -905,6 +937,7 @@ static int Install(void) {
     if (!PatchGameNetModeCalls()) return 0;
     if (!PatchLives()) return 0;
     if (!PatchRemoteControllerCamera()) return 0;
+    if (!PatchWriterPlayerState()) return 0;
     if (!getenv("LANPPART3_DEV_NO_VOICE_PATCH")) PatchVoiceWithoutLocalPlayer();  // (dedicated servers need it; not fatal)
     if (!PatchPostLogin()) return 0;
     if (!PatchIrisServerUpdate()) return 0;

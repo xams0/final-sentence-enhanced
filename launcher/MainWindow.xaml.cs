@@ -33,6 +33,7 @@ namespace Lanppart3Launcher
         public MainWindow()
         {
             InitializeComponent();
+            SizeToScreen();
             Directory.CreateDirectory(AppData.Root);
             Updater.CleanUp();
             ModRuntime.Prepare();
@@ -45,8 +46,7 @@ namespace Lanppart3Launcher
             RemoveOldModFiles();
             try { PresetStore.WriteLua(); }  // the mod's copy of the lobby presets
             catch (IOException) { }
-            ShowWhy();
-            RefreshState();
+            SelectTab(Tab.Play);
             CheckForUpdate();
         }
 
@@ -104,48 +104,6 @@ namespace Lanppart3Launcher
         // ... with the mod.
         bool ModReady => CanPlay && ModRuntime.Available;
 
-        // ---- Texts ----
-
-        void ShowInfo(string title, string text)
-        {
-            if (page != Page.None) return;  // a page is open: keep it
-            InfoTitle.Text = title;
-            InfoText.Text = text;
-        }
-
-        void OnPointNormal(object sender, EventArgs e) => ShowInfo("Mode normal",
-            "Lance Final Sentence tel quel, comme depuis Steam. Le mod Lanppart3 est désactivé : parties rapides, " +
-            "classements, ligues et lobbys utilisent les serveurs officiels.\n\n" +
-            "À choisir pour jouer en ligne avec tout le monde.");
-
-        void OnPointLanppart(object sender, EventArgs e) => ShowInfo("Mode Lanppart3",
-            "Lance le jeu avec le mod Lanppart3. Toute partie lancée depuis un lobby (Partie personnalisée, " +
-            "Créer nouveau) est hébergée par le PC de l'hôte du lobby au lieu des serveurs officiels.\n\n" +
-            "Les règles deviennent libres : roulette russe ou vies dans tous les modes, presets Lanppart Poules " +
-            "et Lanppart Finales (réglables dans « Presets Lanppart »).\n\n" +
-            "Tous les joueurs du lobby doivent lancer le jeu dans ce mode.");
-
-        void OnPointWhy(object sender, EventArgs e) => ShowWhy();
-
-        void ShowWhy() => ShowInfo("Pourquoi deux modes ?",
-            "En ligne, ce sont les serveurs officiels qui appliquent les règles : impossible d'y ajouter des vies " +
-            "ou d'enlever la roulette du Duel. Le mod fait donc jouer un PC du groupe comme serveur : celui de " +
-            "l'hôte du lobby, ou un serveur Lanppart3 dédié.\n\n" +
-            "Pour que vos parties habituelles restent intactes, le mod ne s'active que lorsque le jeu est lancé " +
-            "par ce lanceur en mode Lanppart3. Lancé depuis Steam ou en mode normal, c'est le jeu original.");
-
-        void OnPointHowTo(object sender, EventArgs e) => ShowInfo("Jouer en Lanppart3",
-            "Avec un serveur dédié : l'organisateur ouvre « Héberger un serveur » et règle la partie ; les joueurs " +
-            "ouvrent « Rejoindre un serveur » et choisissent le serveur ; l'organisateur lance la partie.\n\n" +
-            "Sans serveur : tout le monde lance le jeu en mode Lanppart3, l'hôte ouvre « Partie personnalisée », " +
-            "les autres rejoignent son lobby et tout le monde clique « Prêt(e) ». Décocher « Jouer à la roulette " +
-            "russe » fait apparaître la ligne Vies.");
-
-        void OnPointFolder(object sender, EventArgs e) => ShowInfo("Dossier du jeu",
-            install == null
-                ? "Final Sentence n'a pas été trouvé. Cliquez pour indiquer son dossier (celui qui contient TheEnd.exe)."
-                : install.Root + "\n\nCliquez pour l'ouvrir dans l'explorateur.");
-
         // ---- State ----
 
         // The player's own game (dedicated servers run the same executable).
@@ -159,16 +117,18 @@ namespace Lanppart3Launcher
         {
             bool running = PlayerGameRunning();
             bool ready = CanPlay && session == Session.None && !running;
-            NormalButton.IsEnabled = ready;
-            ModButton.IsEnabled = ready && ModReady;
-            BrowserButton.IsEnabled = ModReady;
-            HostButton.IsEnabled = ModReady;
+            if (menuButtons.TryGetValue("normal", out var normal)) normal.IsEnabled = ready;
+            if (menuButtons.TryGetValue("lanppart", out var modded)) modded.IsEnabled = ready && ModReady;
             UpdatePanel.Visibility = updater.State == UpdateState.Available ? Visibility.Visible : Visibility.Collapsed;
-            if (updater.State == UpdateState.Available && !updating) UpdateButton.Content = "Installer la " + updater.LatestTag;
+            if (updater.State == UpdateState.Available && !updating)
+            {
+                UpdateButton.Content = "Installer la " + updater.LatestTag;
+                UpdateText.Text = "Une nouvelle version du lanceur est disponible (" + updater.LatestTag + ") : installez-la pour jouer.";
+            }
 
             if (install == null)
             {
-                GameText.Text = "Final Sentence introuvable : indiquez son dossier avec « Dossier du jeu ».";
+                GameText.Text = "Final Sentence introuvable : indiquez son dossier dans INFOS › Dossier du jeu.";
             }
             else
             {
@@ -189,7 +149,7 @@ namespace Lanppart3Launcher
             else if (updater.State == UpdateState.Checking)
                 StatusText.Text = "Recherche de mises à jour…";
             else if (updater.State == UpdateState.Available && !updating)
-                StatusText.Text = "Une nouvelle version du lanceur est disponible (" + updater.LatestTag + ") : installez-la pour jouer.";
+                StatusText.Text = "Mise à jour requise avant de jouer (bandeau en haut).";
             else if (StatusText.Text.StartsWith("Recherche de mises à jour"))
                 StatusText.Text = "Choisissez un mode.";
             else if (StatusText.Text.Length == 0)
@@ -285,34 +245,6 @@ namespace Lanppart3Launcher
 
         // ---- Actions ----
 
-        void OnLaunchNormal(object sender, RoutedEventArgs e) => Launch(false);
-
-        void OnLaunchLanppart(object sender, RoutedEventArgs e) => Launch(true);
-
-        void OnGameFolder(object sender, RoutedEventArgs e)
-        {
-            if (install != null)
-            {
-                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + install.Root + "\"") { UseShellExecute = true });
-                return;
-            }
-            var dialog = new OpenFileDialog
-            {
-                Title = "Dossier de Final Sentence : choisissez TheEnd.exe",
-                Filter = "Final Sentence (TheEnd.exe)|TheEnd.exe",
-            };
-            if (dialog.ShowDialog(this) != true) return;
-            var found = GameInstall.Find(Path.GetDirectoryName(dialog.FileName));
-            if (found == null)
-            {
-                StatusText.Text = "Ce dossier ne contient pas Final Sentence.";
-                return;
-            }
-            install = found;
-            StatusText.Text = "";
-            RefreshState();
-        }
-
         void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
         void OnQuit(object sender, RoutedEventArgs e) => Close();
@@ -326,6 +258,8 @@ namespace Lanppart3Launcher
                 if (d is System.Windows.Controls.Control && !(d is Window)) return;
                 if (!(d is System.Windows.Media.Visual)) break;
             }
+            if (e.ClickCount == 2) { ToggleMaximized(); return; }
+            if (WindowState == WindowState.Maximized) return;
             DragMove();
         }
 

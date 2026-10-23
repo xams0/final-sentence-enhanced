@@ -73,24 +73,27 @@ namespace Lanppart3Launcher
 
         static Brush Res(string key) => (Brush)Application.Current.Resources[key];
 
+        // A section title, underlined: the sections of a form stay apart.
         public void Section(string title)
         {
-            panel.Children.Add(new TextBlock
+            var head = new StackPanel { Margin = new Thickness(0, panel.Children.Count == 0 ? 0 : 20, 0, 8) };
+            head.Children.Add(new TextBlock { Text = title, FontSize = 21, Foreground = Res("OptionCaption") });
+            head.Children.Add(new System.Windows.Shapes.Rectangle
             {
-                Text = title, FontSize = 20, Foreground = Res("OptionCaption"),
-                Margin = new Thickness(0, panel.Children.Count == 0 ? 0 : 16, 0, 6),
+                Style = (Style)Application.Current.Resources["HLine"], Margin = new Thickness(0, 5, 0, 0),
             });
+            panel.Children.Add(head);
         }
 
         public T Row<T>(string label, T control, string hint = null) where T : FrameworkElement
         {
-            var grid = new Grid { Margin = new Thickness(18, 3, 0, 3), MinHeight = 38 };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(215) });
+            var grid = new Grid { Margin = new Thickness(18, 3, 0, 3), MinHeight = 40 };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var text = new TextBlock
             {
-                Text = label, FontSize = 17, Foreground = Res("OptionLabel"), VerticalAlignment = VerticalAlignment.Center,
-                TextWrapping = TextWrapping.Wrap,
+                Text = label, FontSize = 18, Foreground = Res("OptionLabel"), VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 12, 0),
             };
             if (hint != null) text.ToolTip = hint;
             Grid.SetColumn(control, 1);
@@ -105,12 +108,12 @@ namespace Lanppart3Launcher
         {
             panel.Children.Add(new TextBlock
             {
-                Text = text, FontSize = 14, Foreground = Res("Muted"), TextWrapping = TextWrapping.Wrap,
+                Text = MainWindow.Typo(text), FontSize = 15, Foreground = Res("Muted"), TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(18, 2, 0, 4),
             });
         }
 
-        public static ComboBox Combo(IEnumerable<string> items, int selected, double width = 250)
+        public static ComboBox Combo(IEnumerable<string> items, int selected, double width = 290)
         {
             var c = new ComboBox { Style = (Style)Application.Current.Resources["GameCombo"], Width = width, HorizontalAlignment = HorizontalAlignment.Left };
             foreach (var i in items) c.Items.Add(i);
@@ -121,7 +124,7 @@ namespace Lanppart3Launcher
         public static CheckBox Check(bool value) =>
             new CheckBox { Style = (Style)Application.Current.Resources["GameCheck"], IsChecked = value };
 
-        public static TextBox Text(string value, double width = 250) =>
+        public static TextBox Text(string value, double width = 290) =>
             new TextBox { Style = (Style)Application.Current.Resources["GameText"], Text = value, Width = width, HorizontalAlignment = HorizontalAlignment.Left };
     }
 }

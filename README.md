@@ -12,7 +12,11 @@ aux règles libres, en LAN ou via Radmin VPN.
 
 ## Aperçu
 
-| Lanceur : héberger un serveur | Lanceur : presets Lanppart |
+Le lanceur a trois onglets (JOUER, SERVEUR, INFOS) ; le menu de droite change avec l'onglet.
+
+![Onglet JOUER : rechercher un serveur, lancer le jeu](docs/images/lanceur-jouer.jpg)
+
+| SERVEUR : mes serveurs | SERVEUR : presets Lanppart |
 | --- | --- |
 | ![Héberger un serveur avec le preset Lanppart Finales](docs/images/lanceur-serveur.jpg) | ![Page Presets Lanppart](docs/images/lanceur-presets.jpg) |
 

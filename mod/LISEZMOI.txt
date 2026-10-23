@@ -4,7 +4,7 @@ LANPPART3 - parties entre amis aux règles libres pour Final Sentence (V3)
 Installation
 ------------
 Un seul fichier : Lanppart3-Final-Sentence.exe. Le mettre où vous voulez (Bureau...) et le lancer.
-- Il trouve Final Sentence tout seul dans Steam (sinon : « Dossier du jeu »).
+- Il trouve Final Sentence tout seul dans Steam (sinon : INFOS > Dossier du jeu).
 - Rien n'est copié dans le dossier du jeu : le lanceur démarre le jeu lui-même et y charge le mod
   (fichiers du mod dans %APPDATA%\Lanppart3). Lancé depuis Steam, le jeu est toujours l'original.
 - Steam doit être ouvert, avec un compte qui possède le jeu.
@@ -47,15 +47,21 @@ TOUS les joueurs lancent le jeu avec le lanceur, en mode Lanppart3.
 
 Le lanceur
 ----------
-- Mode normal : le jeu original, serveurs officiels (parties rapides, classement, ligues...).
+Trois onglets en haut ; le menu de droite change avec l'onglet. La fenêtre s'agrandit (bords, bouton □
+ou double-clic en haut) et tout grossit avec elle.
+JOUER
 - Mode Lanppart3 : le jeu avec le mod (lobbys hébergés par l'hôte).
-- Presets Lanppart : les règles des presets Lanppart Poules et Lanppart Finales du jeu.
-- Rejoindre un serveur : liste des serveurs Lanppart3 du réseau local et de Radmin VPN ; cliquer
+- Mode normal : le jeu original, serveurs officiels (parties rapides, classement, ligues...).
+- Rechercher un serveur : liste des serveurs Lanppart3 du réseau local et de Radmin VPN ; cliquer
   "Rejoindre" lance le jeu et s'y connecte. Ou taper l'adresse IP:port du serveur.
-- Héberger un serveur : créer, régler, démarrer et piloter des serveurs dédiés.
+SERVEUR
+- Mes serveurs : créer, régler, démarrer et piloter des serveurs dédiés.
+- Presets Lanppart : les règles des presets Lanppart Poules et Lanppart Finales du jeu.
 - Textes personnalisés : écrire ses textes (une ligne *** sépare deux manches ; les lignes de plus de
   48 caractères sont coupées entre deux mots, comme celles du jeu). Les apostrophes et
   guillemets typographiques (’ “ ” …) sont remplacés par ceux du clavier (' " ...).
+INFOS
+- Comment marche Lanppart3, le dossier du jeu, la version.
 "Lanppart3 Mod v3.x" s'affiche en bas à gauche de l'écran quand le mod est actif.
 Dans le jeu, "Serveurs LAN" (menu principal, Groupe) liste les serveurs : cliquer sur le nom d'un serveur
 pour le rejoindre (le lanceur doit rester ouvert). Le code de lobby n'est plus proposé : on joue en
@@ -63,12 +69,12 @@ réseau local ou Radmin VPN.
 
 Organiser avec un serveur dédié
 -------------------------------
-1. L'organisateur : "Héberger un serveur", choisir le mode (ou un preset Lanppart Poules / Finales),
+1. L'organisateur : SERVEUR > "Mes serveurs", choisir le mode (ou un preset Lanppart Poules / Finales),
    la langue, les textes, les bots, la roulette ou les vies, la durée des manches... puis "Démarrer le
    serveur".
    Le serveur peut tourner sur le PC d'un joueur (même compte Steam) ou sur un PC dédié (son propre
    compte Steam qui possède le jeu : un même compte ne peut pas jouer sur deux PC à la fois).
-2. Les joueurs : "Rejoindre un serveur" dans le lanceur (bouton "Rejoindre"), ou "Serveurs LAN" dans
+2. Les joueurs : JOUER > "Rechercher un serveur" dans le lanceur (bouton "Rejoindre"), ou "Serveurs LAN" dans
    le jeu (cliquer sur le nom du serveur). Ils voient "En attente du lancement de la partie par
    l'organisateur..." jusqu'au départ.
 3. Quand tout le monde est là : l'organisateur clique "Lancer la partie" (les places libres sont
@@ -87,7 +93,7 @@ Jouer avec un lobby
 Décocher "Jouer à la roulette russe" fait apparaître la ligne "Vies".
 
 Presets Lanppart Poules et Lanppart Finales (dans "Mode de jeu") : leurs règles se règlent dans le
-lanceur, page "Presets Lanppart" (nom, mode, roulette ou vies, bots, fautes, durées). Le jeu les relit à
+lanceur, SERVEUR > "Presets Lanppart" (nom, mode, roulette ou vies, bots, fautes, durées). Le jeu les relit à
 chaque lancement : après un changement, relancer le jeu. Choisir un preset remplit la fenêtre avec ses
 règles et les verrouille ; vos propres réglages des modes Battle royale / K.O. / Duel restent intacts.
 Ce sont les presets de l'hôte du lobby qui comptent. Ils se choisissent aussi comme mode d'un serveur

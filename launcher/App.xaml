@@ -11,32 +11,79 @@
     <SolidColorBrush x:Key="Frame" Color="#C27A39" />
     <SolidColorBrush x:Key="Muted" Color="#8C8273" />
     <SolidColorBrush x:Key="TitleRed" Color="#8E1B10" />
+    <SolidColorBrush x:Key="FrameDim" Color="#66C27A39" />
 
-    <Style x:Key="SectionCaption" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="21" />
-      <Setter Property="Foreground" Value="{StaticResource Caption}" />
-      <Setter Property="Margin" Value="0,0,0,6" />
+    <!-- Separators between the parts of the window. -->
+    <Style x:Key="HLine" TargetType="Rectangle">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Fill" Value="{StaticResource FrameDim}" />
+      <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+    <Style x:Key="VLine" TargetType="Rectangle">
+      <Setter Property="Width" Value="1" />
+      <Setter Property="Fill" Value="{StaticResource FrameDim}" />
+      <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
 
-    <!-- Menu entry: plain cream text, framed in orange when pointed at, like the game's menu. -->
+    <Style x:Key="SectionCaption" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="19" />
+      <Setter Property="Foreground" Value="{StaticResource Caption}" />
+      <Setter Property="Margin" Value="0,4,0,4" />
+    </Style>
+
+    <!-- Tabs of the header: spaced capitals, underlined in orange when open. -->
+    <Style x:Key="TabButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource CreamDim}" />
+      <Setter Property="FontSize" Value="23" />
+      <Setter Property="Margin" Value="18,0,18,0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Box" BorderThickness="0,0,0,3" BorderBrush="Transparent" Background="Transparent"
+                    Padding="22,6,22,8" SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource Cream}" />
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource FrameDim}" />
+              </Trigger>
+              <Trigger Property="Tag" Value="Selected">
+                <Setter Property="Foreground" Value="{StaticResource Cream}" />
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Menu entry: plain cream text, framed in orange when pointed at or open, like the game's menu. -->
     <Style x:Key="MenuEntry" TargetType="Button">
       <Setter Property="Foreground" Value="{StaticResource Cream}" />
       <Setter Property="FontSize" Value="23" />
-      <Setter Property="Margin" Value="44,2,0,2" />
+      <Setter Property="Margin" Value="0,2,0,2" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="FocusVisualStyle" Value="{x:Null}" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
             <Border x:Name="Box" BorderThickness="2" BorderBrush="Transparent" Background="Transparent"
-                    Padding="16,7,16,5" SnapsToDevicePixels="True">
+                    Padding="16,7,16,6" SnapsToDevicePixels="True">
               <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
                 <Setter TargetName="Box" Property="Background" Value="#33140C06" />
+              </Trigger>
+              <Trigger Property="Tag" Value="Selected">
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
+                <Setter TargetName="Box" Property="Background" Value="#40C8692A" />
               </Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Frame}" />
@@ -48,10 +95,6 @@
           </ControlTemplate>
         </Setter.Value>
       </Setter>
-    </Style>
-
-    <Style x:Key="TopEntry" TargetType="Button" BasedOn="{StaticResource MenuEntry}">
-      <Setter Property="Margin" Value="-18,2,0,2" />
     </Style>
 
     <Style x:Key="WindowButton" TargetType="Button">

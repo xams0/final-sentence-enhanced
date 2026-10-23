@@ -55,14 +55,21 @@ function Pages.Split(body)
 end
 
 local paging = false  -- the hosted session turns pages
-local queue = {}      -- its next pages: { Text, Id, Difficulty }
+local queue = {}      -- its next pages: { Text, Id, Difficulty, Page, Pages }
 local bag = {}        -- the next texts of the pool, drawn without repeats
 local language, typeMode, currentId
+local playing = {}    -- the page being played: { Id, Page, Pages }
 
 local function Queue(text)
-    for _, body in ipairs(Pages.Split(text.Text)) do
-        queue[#queue + 1] = { Text = body, Id = text.Id, Difficulty = text.Difficulty }
+    local bodies = Pages.Split(text.Text)
+    for i, body in ipairs(bodies) do
+        queue[#queue + 1] = { Text = body, Id = text.Id, Difficulty = text.Difficulty, Page = i, Pages = #bodies }
     end
+end
+
+-- The text being played, its page and its number of pages (for the launcher), or nil.
+function Pages.Playing()
+    return playing.Id, playing.Page, playing.Pages
 end
 
 -- Server: the first page of the session text ({ Text, Id, Difficulty }); the rest waits in the queue
@@ -73,6 +80,7 @@ function Pages.Start(text, lang, opts, lives)
     language, currentId, queue, bag = lang, text.Id, {}, {}
     Queue(text)
     local first = table.remove(queue, 1) or text
+    playing = { Id = text.Id, Page = 1, Pages = paging and #queue + 1 or 1 }
     if not paging and #queue > 0 then
         print(string.format("[Lanppart] text %d is longer than a page: only its first page is played\n", text.Id))
         queue = {}
@@ -108,6 +116,7 @@ local function TurnPage(gm, pool)
         Queue(text)
     end
     local page = table.remove(queue, 1)
+    playing = { Id = page.Id, Page = page.Page, Pages = page.Pages }
     gm:OnGetRandomText({ bSuccessful = true, ErrCode = 200, ErrMsg = "" },
         { Text = page.Text, text_id = page.Id, text_difficulty = page.Difficulty })
     Native.NewPage()

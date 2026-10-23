@@ -41,6 +41,7 @@ namespace Lanppart3Launcher
 
         public string Dir => Path.Combine(AppData.Root, "servers", Id);
         public string SettingsPath => Path.Combine(Dir, "settings.json");
+        public string SessionPath => Path.Combine(Dir, "session.lua");
 
         public bool Running
         {
@@ -50,6 +51,9 @@ namespace Lanppart3Launcher
         public string Phase => Status.TryGetValue("phase", out var p) ? p : (Running ? "boot" : "stopped");
         public int PlayerCount => Status.TryGetValue("count", out var c) && int.TryParse(c, out var n) ? n : 0;
         public string[] Players => Status.TryGetValue("players", out var p) && p.Length > 0 ? p.Split('\t') : new string[0];
+        // The text of the game waiting or in progress, and its page ("2/3").
+        public int PlayingTextId => Status.TryGetValue("text", out var t) && int.TryParse(t, out var id) ? id : 0;
+        public string PlayingPage => Status.TryGetValue("page", out var p) ? p : "";
 
         public string PhaseText
         {
@@ -134,6 +138,15 @@ namespace Lanppart3Launcher
         // Session file for the server: the chosen texts (the catalog's game texts, the custom texts).
         public void WriteSession(ServerInstance server)
         {
+            var text = SessionText(server);
+            Directory.CreateDirectory(server.Dir);
+            server.Settings.Save(server.SettingsPath);
+            File.WriteAllText(server.SessionPath, text, new UTF8Encoding(false));
+        }
+
+        // The session file the server's settings make now (what "Appliquer les réglages" would write).
+        public string SessionText(ServerInstance server)
+        {
             var s = server.Settings.Effective();
             var custom = new List<CustomText>();
             var ids = new List<int>();
@@ -146,9 +159,7 @@ namespace Lanppart3Launcher
                 ids.AddRange(s.SelectedTextIds);
                 custom.AddRange(TextLibrary.LoadCustom().Where(t => s.SelectedCustomTexts.Contains(t.File)));
             }
-            Directory.CreateDirectory(server.Dir);
-            server.Settings.Save(server.SettingsPath);
-            File.WriteAllText(Path.Combine(server.Dir, "session.lua"), s.ToLua(custom, ids.Distinct()), new UTF8Encoding(false));
+            return s.ToLua(custom, ids.Distinct());
         }
 
         public void Start(ServerInstance server, GameInstall install)

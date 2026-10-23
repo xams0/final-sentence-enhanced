@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Lanppart3Launcher
 {
@@ -123,6 +124,45 @@ namespace Lanppart3Launcher
             while (s.Contains("]" + new string('=', level) + "]")) level++;
             var eq = new string('=', level);
             return "[" + eq + "[\n" + s + "]" + eq + "]";
+        }
+    }
+
+    // What a running server plays: the session.lua written at its start or by "Appliquer les réglages" (ToLua).
+    public sealed class AppliedSession
+    {
+        public ServerSettings Rules = new ServerSettings();
+        public readonly List<CustomText> Custom = new List<CustomText>();
+        public readonly Dictionary<int, string> CustomTitles = new Dictionary<int, string>();
+        public readonly List<int> GameTextIds = new List<int>();
+
+        public static AppliedSession Read(string path)
+        {
+            string lua;
+            try { lua = File.ReadAllText(path, Encoding.UTF8); }
+            catch (IOException) { return null; }
+            var session = new AppliedSession();
+            var rules = session.Rules;
+            int Int(string key, int fallback)
+            {
+                var m = Regex.Match(lua, @"\b" + key + @" = (\d+)");
+                return m.Success ? int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : fallback;
+            }
+            rules.Mode = (GameMode)Int("Mode", (int)rules.Mode);
+            rules.Lives = Int("Lives", rules.Lives);
+            rules.RoundDuration = Int("RoundDuration", rules.RoundDuration);
+            rules.Roulette = Regex.IsMatch(lua, @"\bRoulette = true");
+            var ids = Regex.Match(lua, @"\bTextIds = \{([^}]*)\}");
+            if (ids.Success)
+                foreach (Match id in Regex.Matches(ids.Groups[1].Value, @"\d+")) session.GameTextIds.Add(int.Parse(id.Value, CultureInfo.InvariantCulture));
+            var texts = new Regex(@"\{ Id = (\d+), Title = ""((?:[^""\\]|\\.)*)"", Difficulty = (\d+), Body = \[(=*)\[\n(.*?)\]\4\] \}",
+                                  RegexOptions.Singleline);
+            foreach (Match t in texts.Matches(lua))
+            {
+                var title = Regex.Replace(t.Groups[2].Value, @"\\(.)", m => m.Groups[1].Value == "n" ? "\n" : m.Groups[1].Value);
+                session.Custom.Add(new CustomText { Title = title, Body = t.Groups[5].Value });
+                session.CustomTitles[int.Parse(t.Groups[1].Value, CultureInfo.InvariantCulture)] = title;
+            }
+            return session;
         }
     }
 }

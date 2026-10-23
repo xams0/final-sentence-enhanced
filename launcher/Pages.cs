@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -166,7 +168,7 @@ namespace Lanppart3Launcher
             if (s.Texts == TextSource.Selection) form.Children.Add(TextPicker(server, catalog, custom, rebuild));
             int pool = s.Texts == TextSource.GameTexts ? catalog.Count : s.Texts == TextSource.CustomTexts ? custom.Count :
                        s.Texts == TextSource.Both ? catalog.Count + custom.Count : s.SelectedTextIds.Count + s.SelectedCustomTexts.Count;
-            o.Note(pool + " texte(s) dans la rotation, tirés au hasard sans répétition." +
+            o.Note("Avec ces réglages : " + pool + " texte(s) dans la rotation, tirés au hasard sans répétition." +
                    (catalog.Count == 0 && s.Texts != TextSource.CustomTexts
                        ? " La liste des textes du jeu apparaît après un premier lancement en mode Lanppart3 ou d'un serveur." : ""));
             foreach (var (text, warning) in RotationAdvice(rules, RotationOf(s, catalog, custom)))
@@ -294,11 +296,35 @@ namespace Lanppart3Launcher
         {
             var s = server.Settings;
             var rules = s.Effective();
-            var rotation = RotationOf(s, TextLibrary.LoadCatalog().Where(t => t.Language == s.Language && t.Fits(rules.Mode)).ToList(),
+            // The rotation: a running server's applied session, otherwise what its next start will apply.
+            var catalog = TextLibrary.LoadCatalog();
+            var applied = server.Running ? AppliedSession.Read(server.SessionPath) : null;
+            Rotation rotation;
+            var rotationRules = rules;
+            bool pending = false;
+            if (applied != null)
+            {
+                rotation = new Rotation { Custom = applied.Custom, GameTexts = applied.GameTextIds.Count };
+                rotationRules = applied.Rules;
+                try { pending = File.ReadAllText(server.SessionPath, Encoding.UTF8) != servers.SessionText(server); }
+                catch (IOException) { }
+            }
+            else
+                rotation = RotationOf(s, catalog.Where(t => t.Language == s.Language && t.Fits(rules.Mode)).ToList(),
                                       TextLibrary.LoadCustom().Where(t => t.Language == s.Language).ToList());
-            var advice = RotationAdvice(rules, rotation);
+            var advice = RotationAdvice(rotationRules, rotation);
+            string playing = null;
+            if (server.Running && server.PlayingTextId != 0)
+            {
+                int id = server.PlayingTextId;
+                var title = applied != null && applied.CustomTitles.TryGetValue(id, out var custom) ? custom
+                          : catalog.FirstOrDefault(t => t.Id == id)?.Title ?? "texte " + id;
+                var page = server.PlayingPage.Split('/');
+                playing = (server.Phase == "playing" ? "Texte en cours : « " : "Texte de la partie : « ") + title + " »" +
+                          (page.Length == 2 && page[1] != "1" ? " · page " + page[0] + " sur " + page[1] : "");
+            }
             var key = string.Join("|", server.Running, server.Phase, server.PlayerCount, string.Join(",", server.Players), s.Name,
-                                  rules.Mode, rules.Roulette, rules.Lives, s.Port, s.Preset, ModReady,
+                                  rules.Mode, rules.Roulette, rules.Lives, s.Port, s.Preset, ModReady, applied != null, pending, playing,
                                   string.Join(",", rotation.Custom.Select(t => t.Title + ":" + t.Layout.Pages)), rotation.GameTexts,
                                   string.Join(",", advice.Select(a => a.Text)));
             if (Equals(side.Tag, key)) return;  // unchanged: keep the buttons as they are (hover, clicks)
@@ -349,7 +375,12 @@ namespace Lanppart3Launcher
             }
 
             side.Children.Add(HLine(16, 10));
+            if (playing != null) side.Children.Add(Label(playing, 16, "Cream", new Thickness(0, 0, 0, 10)));
             side.Children.Add(Label("Textes de la rotation", 18, "OptionCaption"));
+            side.Children.Add(Label(applied != null ? "Ceux que le serveur utilise." : "Ceux du prochain démarrage du serveur.", 14, "Muted"));
+            if (pending)
+                side.Children.Add(Label("Attention : les réglages ont changé depuis. « Appliquer les réglages » pour les utiliser " +
+                                        "(à partir de la partie suivante).", 14, "Caption", new Thickness(0, 4, 0, 0)));
             foreach (var t in rotation.Custom)
                 side.Children.Add(Label("« " + t.Title + " » · " + Plural(t.Layout.Rounds.Count, "manche") + " · " +
                                         Plural(t.Layout.Pages, "page"), 15, "CreamDim", new Thickness(0, 4, 0, 0)));

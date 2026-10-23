@@ -4,6 +4,7 @@
 local Host = require("host")
 local Native = require("native")
 local Texts = require("texts")
+local Pages = require("pages")
 
 local Server = {}
 
@@ -150,6 +151,8 @@ end
 -- key=value lines for the launcher; rewritten when something changes, and every few seconds as a heartbeat.
 local function WriteStatus(gs)
     local humans = gs and Humans(gs) or {}
+    local playingId, page, pages = Pages.Playing()
+    if phase ~= "playing" and phase ~= "waiting" then playingId = nil end
     local status = table.concat({
         "phase=" .. phase,
         "session=" .. sessionNumber,
@@ -158,6 +161,8 @@ local function WriteStatus(gs)
         "count=" .. #humans,
         "capacity=" .. (settings and CAPACITY[settings.Mode] or 0),
         "state=" .. (gs and gs.SessionState or -1),
+        "text=" .. (playingId or ""),
+        "page=" .. (playingId and (page .. "/" .. pages) or ""),
     }, "\n")
     if status == lastStatus and os.time() - (Server.statusTime or 0) < 3 then return end
     lastStatus = status

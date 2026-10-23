@@ -88,9 +88,18 @@ local function Wrap(line)
     return lines
 end
 
+-- Characters no keyboard types (the game's own texts never use them), and what to type instead.
+local UNTYPEABLE = {
+    ["•"] = "-", ["·"] = "-", ["–"] = "-", ["—"] = "-", ["…"] = "...",
+    ["«"] = "\"", ["»"] = "\"", ["“"] = "\"", ["”"] = "\"", ["‘"] = "'", ["’"] = "'",
+    ["œ"] = "oe", ["Œ"] = "OE", ["æ"] = "ae", ["Æ"] = "AE",
+    ["\u{A0}"] = " ", ["\u{202F}"] = " ",
+}
+
 -- Game format: CRLF lines of at most MAX_LINE characters, rounds separated by a "***" line.
 local function GameFormat(body)
     local out = {}
+    for from, to in pairs(UNTYPEABLE) do body = body:gsub(from, to) end
     for line in (body:gsub("\r\n", "\n") .. "\n"):gmatch("([^\n]*)\n") do
         line = line:gsub("%s+$", "")
         if line == "" then

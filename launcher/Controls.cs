@@ -113,6 +113,15 @@ namespace Lanppart3Launcher
             });
         }
 
+        public void Warning(string text)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = MainWindow.Typo("Attention : " + text), FontSize = 15, Foreground = Res("Caption"), TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(18, 2, 0, 4),
+            });
+        }
+
         public static ComboBox Combo(IEnumerable<string> items, int selected, double width = 290)
         {
             var c = new ComboBox { Style = (Style)Application.Current.Resources["GameCombo"], Width = width, HorizontalAlignment = HorizontalAlignment.Left };

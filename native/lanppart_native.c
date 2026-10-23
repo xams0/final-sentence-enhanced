@@ -363,6 +363,7 @@ typedef double (*GetServerTime_t)(void* gs);
 #define RVA_KO_KNOCKDOWN_CALL      0x42CDFA3  // K.O. round end: Execute(last writer, Knockdown)
 #define RVA_KO_FINAL_CHECK         0x42CDF50  // ... cmp [gs+478h], 2 / je WinMatch: two writers left, no knockdown
 #define RVA_WIN_MATCH              0x42E5C50  // GameState: the writer wins, every other one is executed
+#define RVA_TEXT_END_JUMP          0x42CDDAB  // round end: the writer finished the text's last round -> WinMatch
 #define RVA_RESET_ROUND_MISTAKES   0x42FA980  // PlayerState: clear the round's typing/mistake state
 #define RVA_SET_WRITER_STATE       0x42FC0E0  // PlayerState: SetWriterState(EPGWriterState)
 #define RVA_BOTPC_STATICCLASS      0x4287BF0  // bot controller StaticClass
@@ -378,9 +379,12 @@ typedef double (*GetServerTime_t)(void* gs);
 #define VT_ACTOR_FORCENETUPDATE    0x6D8
 #define VT_GS_GETSERVERTIME        0x730
 #define TYPEMODE_Knockdown         1
+#define TYPEMODE_Duel              2
 #define ROLE_Authority 3
 #define WS_Typing   2
+#define WS_Rewinding 3
 #define WS_Await    4
+#define WS_BetweenRounds 5
 #define WS_Roulette 6
 #define WS_Executed 7
 #define WS_Dead     8
@@ -533,12 +537,35 @@ static void OnMistakesExecute(uint8_t* gs, uint8_t* ps, float delay, uint8_t res
 }
 
 // A rewind or the round timer would end the writer's round too late.
+static int SharedRounds(uint8_t* gs) {
+    return TypeMode(gs) == TYPEMODE_Knockdown || TypeMode(gs) == TYPEMODE_Duel;
+}
+
+static int StillTyping(uint8_t* ps) {
+    return ps[OFF_PS_WRITERSTATE] == WS_Typing || ps[OFF_PS_WRITERSTATE] == WS_Rewinding;
+}
+
+// K.O. / Duel: once nobody types the round anymore, the writers who finished it go on. (The game leaves
+// that to the deaths of the round: with lives, the writers out of time live on and go on by themselves.)
+static void AdvanceWaitingWriters(uint8_t* gs) {
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    for (int32_t i = 0; i < players->Num; i++) {
+        uint8_t* p = ((uint8_t**)players->Data)[i];
+        if (p && StillTyping(p)) return;
+    }
+    for (int32_t i = 0; i < players->Num; i++) {
+        uint8_t* p = ((uint8_t**)players->Data)[i];
+        if (p && p[OFF_PS_WRITERSTATE] == WS_Await) ((AdvanceRound_t)AT(RVA_ADVANCE_ROUND))(gs, p, 0);
+    }
+}
+
 static void OnRoundLost(uint8_t* gs, uint8_t* ps, float delay, uint8_t result) {
     if (!LivesActive(gs) || (result != RESULT_RoundTimeout && result != RESULT_SkipRewindToExecute)) {
         Execute(gs, ps, delay, result);
         return;
     }
     LoseLife(gs, ps, delay, result, 1);
+    if (SharedRounds(gs)) AdvanceWaitingWriters(gs);
 }
 
 // K.O. with two writers left: the game knocks nobody out, the first to finish the round wins and the other
@@ -563,19 +590,24 @@ static void SetKnockdownFinal(int lives) {
     if (g_koFinalCount && *g_koFinalCount != count) WriteCode(g_koFinalCount, &count, 1);
 }
 
+// The writer lost their last life and one writer is left (the game only counts the living): they win,
+// as in the game's final.
+static void WinIfLastOneLeft(uint8_t* gs, uint8_t* loser) {
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    if (!loser || loser[OFF_PS_WRITERSTATE] != WS_Executed || players->Num != 2) return;
+    for (int32_t i = 0; i < players->Num; i++) {
+        uint8_t* other = ((uint8_t**)players->Data)[i];
+        if (!other || other == loser) continue;
+        Log("Lives: writer %d wins", *(int32_t*)(other + OFF_PS_WRITERID));
+        ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, other, 0);
+    }
+}
+
 // K.O.: the last writer of a round is knocked out.
 static void OnKnockdown(uint8_t* gs, uint8_t* ps, float delay, uint8_t result) {
     if (LivesActive(gs)) {
         LoseLife(gs, ps, delay, result, 1);
-        // One of the last two writers lost their last life: the other wins, as in the game's final.
-        TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
-        if (!ps || ps[OFF_PS_WRITERSTATE] != WS_Executed || players->Num != 2) return;
-        for (int32_t i = 0; i < players->Num; i++) {
-            uint8_t* other = ((uint8_t**)players->Data)[i];
-            if (!other || other == ps) continue;
-            Log("K.O. final: writer %d wins", *(int32_t*)(other + OFF_PS_WRITERID));
-            ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, other, 0);
-        }
+        WinIfLastOneLeft(gs, ps);
         return;
     }
     if (IsServer(gs) && gs[OFF_GS_OPTIONS + OPT_PLAYROULETTE]) {
@@ -583,6 +615,34 @@ static void OnKnockdown(uint8_t* gs, uint8_t* ps, float delay, uint8_t result) {
         return;
     }
     Execute(gs, ps, delay, result);
+}
+
+// The writer finished the last round of the session text: the game ends the match (they win, everyone
+// behind is executed). With lives in K.O. and Duel the text is only a page (lanppart_new_page): the round
+// ends as any other one, and the Lua host turns the page once nobody types it anymore.
+static void OnTextFinished(uint8_t* gs, uint8_t* ps, char fromRoulette) {
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    if (!LivesActive(gs) || !SharedRounds(gs) || players->Num < 2) {
+        ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, ps, fromRoulette);
+        return;
+    }
+    uint8_t* last = NULL;
+    int typing = 0;
+    for (int32_t i = 0; i < players->Num; i++) {
+        uint8_t* p = ((uint8_t**)players->Data)[i];
+        if (p && p != ps && StillTyping(p)) {
+            typing++;
+            last = p;
+        }
+    }
+    ((PsVoid_t)AT(RVA_RESET_ROUND_MISTAKES))(ps);
+    ((SetWriterState_t)AT(RVA_SET_WRITER_STATE))(ps, WS_Await);
+    ForceNetUpdate(ps);
+    Log("Pages: writer %d finished the page, %d still typing", *(int32_t*)(ps + OFF_PS_WRITERID), typing);
+    if (typing != 1) return;
+    // The last one typing the round: a K.O. knockdown, a lost Duel round.
+    LoseLife(gs, last, 0, TypeMode(gs) == TYPEMODE_Duel ? RESULT_SkipRouletteToExecute : RESULT_Knockdown, 1);
+    WinIfLastOneLeft(gs, last);
 }
 
 // The game resolves a surviving roulette only for Battle Royale and Duel writers; a K.O. survivor would
@@ -891,6 +951,7 @@ static int PatchLives(void) {
            RedirectCall(RVA_BR_SKIP_REWIND_CALL, RVA_EXECUTE_WRITER, (void*)&OnRoundLost, "Rewind execution") &&
            RedirectCall(RVA_ROUND_TIMEOUT_CALL, RVA_EXECUTE_WRITER, (void*)&OnRoundLost, "Round timeout") &&
            RedirectCall(RVA_KO_KNOCKDOWN_CALL, RVA_EXECUTE_WRITER, (void*)&OnKnockdown, "K.O. knockdown") &&
+           RedirectCall(RVA_TEXT_END_JUMP, RVA_WIN_MATCH, (void*)&OnTextFinished, "Text end") &&
            RedirectCall(RVA_MANDATORY_ADDBOT_CALL, RVA_ADD_BOT, (void*)&AddMandatoryBot, "Mandatory bots") &&
            RedirectCall(RVA_PRESPAWN_ADDBOT_CALL, RVA_ADD_BOT, (void*)&GameAddedBot, "Pre-spawned bots") &&
            RedirectCall(kScheduledAddBotJumps[0], RVA_ADD_BOT, (void*)&GameAddedBot, "Scheduled bots") &&
@@ -1201,10 +1262,19 @@ __declspec(dllexport) int lanppart_refresh_ownership(void* L) {
     return 0;
 }
 
-// Server, called periodically by the Lua host: game state upkeep the game doesn't do itself.
-__declspec(dllexport) int lanppart_server_tick(void* L) {
-    (void)L;
-    if (!g_installed) return 0;
+// K.O. / Duel with lives: the last writer alive wins. (The game only checks a writer waiting for the others;
+// with lives the survivor may as well be between rounds.)
+static void WinIfAlone(uint8_t* gs) {
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    if (!LivesActive(gs) || !SharedRounds(gs) || players->Num != 1) return;
+    uint8_t* ps = ((uint8_t**)players->Data)[0];
+    if (!ps || ps[OFF_PS_WRITERSTATE] != WS_BetweenRounds) return;
+    Log("Lives: writer %d is the last one alive", *(int32_t*)(ps + OFF_PS_WRITERID));
+    ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, ps, 0);
+}
+
+// The game state of the session this game hosts, or NULL.
+static uint8_t* HostedGameState(void) {
     void* engine = *(void**)AT(RVA_GENGINE);
     TArrayRaw* list = (TArrayRaw*)((uint8_t*)engine + OFF_ENGINE_WORLDLIST);
     for (int i = 0; i < list->Num; i++) {
@@ -1214,10 +1284,58 @@ __declspec(dllexport) int lanppart_server_tick(void* L) {
         // Only our hosted sessions have a net driver without a server connection.
         if (!driver || *(void**)(driver + OFF_NETDRIVER_SERVERCONNECTION)) continue;
         uint8_t* gs = *(uint8_t**)(world + OFF_WORLD_GAMESTATE);
-        if (!gs) continue;
-        ResolveKnockdownRoulettes(gs);
-        ResumeWriters(gs);
+        if (gs) return gs;
     }
+    return NULL;
+}
+
+// Server, called periodically by the Lua host: game state upkeep the game doesn't do itself.
+__declspec(dllexport) int lanppart_server_tick(void* L) {
+    (void)L;
+    if (!g_installed) return 0;
+    uint8_t* gs = HostedGameState();
+    if (!gs) return 0;
+    ResolveKnockdownRoulettes(gs);
+    ResumeWriters(gs);
+    WinIfAlone(gs);
+    return 0;
+}
+
+// ---- Pages (lives in K.O. and Duel) ----
+// The typewriter draws the whole session text on one page of about 80 lines: far too short for the
+// rounds lives need. When a page is done, the Lua host gives the session its next text
+// (OnGetRandomText, replicated) and lanppart_new_page sends every writer still playing back to its
+// first round: carriage 0, round -1 (the game counts it up when the round starts), between rounds.
+#define OFF_PS_LOCALCARRIAGE 0x49C
+#define WS_Finished 9
+
+__declspec(dllexport) int lanppart_new_page(void* L) {
+    (void)L;
+    if (!g_installed) return 0;
+    uint8_t* gs = HostedGameState();
+    if (!gs) return 0;
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    int moved = 0;
+    for (int32_t i = 0; i < players->Num; i++) {
+        uint8_t* ps = ((uint8_t**)players->Data)[i];
+        if (!ps) continue;
+        uint8_t state = ps[OFF_PS_WRITERSTATE];
+        if (state == WS_Executed || state == WS_Dead || state == WS_Finished) continue;
+        *(int32_t*)(ps + OFF_PS_CARRIAGE) = 0;
+        *(int32_t*)(ps + OFF_PS_LOCALCARRIAGE) = 0;
+        *(int32_t*)(ps + OFF_PS_ROUND) = -1;
+        ((AdvanceRound_t)AT(RVA_ADVANCE_ROUND))(gs, ps, state == WS_Roulette);
+        uint8_t* owner = *(uint8_t**)(ps + OFF_ACTOR_OWNER);
+        if (!(ps[OFF_PLAYERSTATE_FLAGS] & PLAYERSTATE_FLAG_BOT)) {
+            if (IsA(owner, ((StaticClass_t)AT(RVA_GAMEPLAYPC_STATICCLASS))()))
+                ((SendRecoverRPC_t)AT(RVA_SEND_RECOVER_RPC))(owner, 0);
+        } else if (IsA(owner, ((StaticClass_t)AT(RVA_BOTPC_STATICCLASS))())) {
+            ((BotJumpTo_t)AT(RVA_BOT_JUMP_TO))(*(void**)(owner + OFF_BOTPC_TYPIST), 0, 0);
+        }
+        ForceNetUpdate(ps);
+        moved++;
+    }
+    Log("New page: %d writers back to the first round", moved);
     return 0;
 }
 

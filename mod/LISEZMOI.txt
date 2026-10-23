@@ -33,8 +33,9 @@ Dans les deux cas, les règles sont libres :
   que le jeu aurait déclenché la roulette ou éliminé un joueur (dernier d'une manche, trop de fautes,
   manche trop longue), le joueur perd une vie. À 0 vie, le gardien l'exécute.
 - K.O. et Duel avec vies : seul celui qui perd sa dernière vie est éliminé. Le dernier d'un paragraphe
-  perd une vie et continue. La partie dure jusqu'à ce qu'il ne reste qu'un joueur : le serveur enchaîne
-  assez de paragraphes (plusieurs textes à la suite).
+  perd une vie et continue (comme ceux qui n'ont pas fini à temps). La partie dure jusqu'à ce qu'il ne
+  reste qu'un joueur : quand la page de la machine à écrire est finie, une nouvelle page arrive (la suite
+  du texte, puis les autres textes choisis).
 - Battle royale avec vies : trop de fautes coûte une vie, puis le joueur continue à taper.
 - Les vies s'affichent en cœurs : « Xams - ♥♥♥ » à côté des noms en Duel, dans le classement (Tab),
   à côté de la langue du clavier dans les autres modes, et sur la ligne « Vies » de la création de partie.
@@ -58,8 +59,12 @@ SERVEUR
 - Mes serveurs : créer, régler, démarrer et piloter des serveurs dédiés.
 - Presets Lanppart : les règles des presets Lanppart Poules et Lanppart Finales du jeu.
 - Textes personnalisés : écrire ses textes (une ligne *** sépare deux manches ; les lignes de plus de
-  48 caractères sont coupées entre deux mots, comme celles du jeu). Les apostrophes et
-  guillemets typographiques (’ “ ” …) sont remplacés par ceux du clavier (' " ...).
+  48 caractères sont coupées entre deux mots, comme celles du jeu). Les caractères qu'aucun clavier
+  ne tape sont remplacés : ’ “ ” « » … • – œ deviennent ' " " " " ... - - oe. Une page de la machine
+  à écrire contient environ 80 lignes : un texte plus long est découpé en pages.
+  Sous le texte : ses manches, ses lignes et ses pages, avec des avertissements. Dans Mes serveurs, la
+  rotation indique ses pages et prévient si un texte ne sera pas joué en entier ou si une manche dépasse
+  la durée réglée.
 INFOS
 - Comment marche Lanppart3, le dossier du jeu, la version.
 "Lanppart3 Mod v3.x" s'affiche en bas à gauche de l'écran quand le mod est actif.

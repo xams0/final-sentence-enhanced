@@ -28,6 +28,105 @@ namespace Lanppart3Launcher
         }
 
         public int Rounds => Body.Replace("\r\n", "\n").Split('\n').Count(l => l.Trim() == "***") + 1;
+
+        public TextLayout Layout => TextLayout.Of(Body);
+    }
+
+    // A custom text as the mod lays it out on the typewriter (texts.lua GameFormat, pages.lua Split): characters
+    // no keyboard types replaced, lines of at most 48 characters cut between words, blank lines dropped, rounds
+    // separated by a "***" line. The typewriter draws the session text on one page of 81 rows, a blank row
+    // between two rounds: the mod cuts texts into pages of at most 80 rows.
+    public sealed class TextLayout
+    {
+        public const int MaxLine = 48;
+        public const int PageRows = 80;
+
+        public readonly List<List<string>> Rounds = new List<List<string>>();
+        public readonly List<int> PageRowCounts = new List<int>();
+        public readonly List<int> PageRoundCounts = new List<int>();
+        public readonly List<string> Replaced = new List<string>();  // the replaced characters found
+
+        public int Lines => Rounds.Sum(r => r.Count);
+        public int Pages => PageRowCounts.Count;
+        public int LongestRound => Rounds.Count == 0 ? 0 : Rounds.Max(r => r.Count);
+        public int LongestRoundChars => Rounds.Count == 0 ? 0 : Rounds.Max(r => r.Sum(l => l.Length + 1));
+
+        static readonly Dictionary<string, string> Untypeable = new Dictionary<string, string>
+        {
+            ["•"] = "-", ["·"] = "-", ["–"] = "-", ["—"] = "-", ["…"] = "...",
+            ["«"] = "\"", ["»"] = "\"", ["“"] = "\"", ["”"] = "\"", ["‘"] = "'", ["’"] = "'",
+            ["œ"] = "oe", ["Œ"] = "OE", ["æ"] = "ae", ["Æ"] = "AE", [" "] = " ", [" "] = " ",
+        };
+
+        public static string Typeable(string s)
+        {
+            s = s ?? "";
+            foreach (var kv in Untypeable) s = s.Replace(kv.Key, kv.Value);
+            return s;
+        }
+
+        public static TextLayout Of(string body)
+        {
+            var layout = new TextLayout();
+            body = body ?? "";
+            foreach (var kv in Untypeable)
+                if (body.Contains(kv.Key)) layout.Replaced.Add(kv.Key == " " || kv.Key == " " ? "espace insécable" : kv.Key);
+            var current = new List<string>();
+            foreach (var raw in Typeable(body).Replace("\r\n", "\n").Split('\n'))
+            {
+                var line = raw.TrimEnd();
+                if (line.Trim() == "***")
+                {
+                    if (current.Count > 0) layout.Rounds.Add(current);
+                    current = new List<string>();
+                }
+                else if (line.Length > 0) current.AddRange(Wrap(line));
+            }
+            if (current.Count > 0) layout.Rounds.Add(current);
+
+            int rows = 0, roundsOnPage = 0;
+            foreach (var round in layout.Rounds)
+                for (int first = 0; first < round.Count; first += PageRows)
+                {
+                    int lines = Math.Min(PageRows, round.Count - first);
+                    int needed = lines + (roundsOnPage > 0 ? 1 : 0);
+                    if (rows + needed > PageRows)
+                    {
+                        layout.PageRowCounts.Add(rows);
+                        layout.PageRoundCounts.Add(roundsOnPage);
+                        rows = roundsOnPage = 0;
+                        needed = lines;
+                    }
+                    rows += needed;
+                    roundsOnPage++;
+                }
+            if (roundsOnPage > 0)
+            {
+                layout.PageRowCounts.Add(rows);
+                layout.PageRoundCounts.Add(roundsOnPage);
+            }
+            return layout;
+        }
+
+        static IEnumerable<string> Wrap(string line)
+        {
+            if (line.Length <= MaxLine) { yield return line; yield break; }
+            var current = "";
+            foreach (var w in line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var word = w;
+                while (word.Length > MaxLine)  // (a word longer than a line: cut it)
+                {
+                    if (current.Length > 0) { yield return current; current = ""; }
+                    yield return word.Substring(0, MaxLine);
+                    word = word.Substring(MaxLine);
+                }
+                if (current.Length == 0) current = word;
+                else if (current.Length + 1 + word.Length <= MaxLine) current += " " + word;
+                else { yield return current; current = word; }
+            }
+            if (current.Length > 0) yield return current;
+        }
     }
 
     // A text of the game's own database, as listed by the mod (catalog.txt).

@@ -39,5 +39,7 @@ function Native.ServerStart() return Call("lanppart_server_start") end
 function Native.DumpTexts() return Call("lanppart_dump_texts") end
 -- Lives instead of the roulette for the sessions hosted from now on.
 function Native.SetLives(on) return Call(on and "lanppart_lives_on" or "lanppart_lives_off") end
+-- Server: every writer still playing goes back to the first round of the (new) session text.
+function Native.NewPage() return Call("lanppart_new_page") end
 
 return Native

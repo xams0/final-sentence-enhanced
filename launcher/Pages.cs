@@ -163,12 +163,14 @@ namespace Lanppart3Launcher
             source.SelectionChanged += (x, e) => { s.Texts = (TextSource)source.SelectedIndex; SaveSettings(server); rebuild(); };
             var catalog = TextLibrary.LoadCatalog().Where(t => t.Language == s.Language && t.Fits(rules.Mode)).ToList();
             var custom = TextLibrary.LoadCustom().Where(t => t.Language == s.Language).ToList();
-            if (s.Texts == TextSource.Selection) form.Children.Add(TextPicker(server, catalog, custom));
+            if (s.Texts == TextSource.Selection) form.Children.Add(TextPicker(server, catalog, custom, rebuild));
             int pool = s.Texts == TextSource.GameTexts ? catalog.Count : s.Texts == TextSource.CustomTexts ? custom.Count :
                        s.Texts == TextSource.Both ? catalog.Count + custom.Count : s.SelectedTextIds.Count + s.SelectedCustomTexts.Count;
             o.Note(pool + " texte(s) dans la rotation, tirés au hasard sans répétition." +
                    (catalog.Count == 0 && s.Texts != TextSource.CustomTexts
                        ? " La liste des textes du jeu apparaît après un premier lancement en mode Lanppart3 ou d'un serveur." : ""));
+            foreach (var (text, warning) in RotationAdvice(rules, RotationOf(s, catalog, custom)))
+                if (warning) o.Warning(text); else o.Note(text);
 
             if (s.Preset < 0)
             {
@@ -229,12 +231,12 @@ namespace Lanppart3Launcher
             {
                 var lives = o.Row("Vies", new Stepper(s.Lives, 1, 6),
                                   "Chaque fois que le jeu déclencherait la roulette ou une élimination, le joueur perd une vie.");
-                lives.ValueChanged += v => { s.Lives = v; save(); };
+                lives.ValueChanged += v => { s.Lives = v; save(); rebuild(); };
             }
 
             o.Section("Durée");
             var round = o.Row("Durée de la manche", new Stepper(s.RoundDuration, 30, 900, 10, Stepper.Duration));
-            round.ValueChanged += v => { s.RoundDuration = v; save(); };
+            round.ValueChanged += v => { s.RoundDuration = v; save(); rebuild(); };
             if (s.Mode == GameMode.BattleRoyale)
             {
                 var pause = o.Row("Durée de la pause", new Stepper(s.PauseDuration, 0, 60, 5, Stepper.Duration));
@@ -243,7 +245,7 @@ namespace Lanppart3Launcher
         }
 
         // Check list of the language's texts, for "Sélection…".
-        UIElement TextPicker(ServerInstance server, List<GameText> catalog, List<CustomText> custom)
+        UIElement TextPicker(ServerInstance server, List<GameText> catalog, List<CustomText> custom, Action rebuild)
         {
             var s = server.Settings;
             var list = new StackPanel();
@@ -263,11 +265,13 @@ namespace Lanppart3Launcher
                 list.Children.Add(row);
             }
             foreach (var t in custom)
-                Add(t.Title, "personnalisé · " + t.Rounds + " manches", s.SelectedCustomTexts.Contains(t.File), on =>
+                Add(t.Title, "personnalisé · " + Plural(t.Layout.Rounds.Count, "manche") + " · " + Plural(t.Layout.Pages, "page"),
+                    s.SelectedCustomTexts.Contains(t.File), on =>
                 {
                     s.SelectedCustomTexts.Remove(t.File);
                     if (on) s.SelectedCustomTexts.Add(t.File);
                     SaveSettings(server);
+                    rebuild();
                 });
             foreach (var t in catalog)
                 Add(t.Title, "jeu · difficulté " + t.Difficulty, s.SelectedTextIds.Contains(t.Id), on =>
@@ -275,6 +279,7 @@ namespace Lanppart3Launcher
                     s.SelectedTextIds.Remove(t.Id);
                     if (on) s.SelectedTextIds.Add(t.Id);
                     SaveSettings(server);
+                    rebuild();
                 });
             if (list.Children.Count == 0) list.Children.Add(Label("Aucun texte pour cette langue et ce mode.", 16, "Muted"));
             return new Border
@@ -289,8 +294,13 @@ namespace Lanppart3Launcher
         {
             var s = server.Settings;
             var rules = s.Effective();
+            var rotation = RotationOf(s, TextLibrary.LoadCatalog().Where(t => t.Language == s.Language && t.Fits(rules.Mode)).ToList(),
+                                      TextLibrary.LoadCustom().Where(t => t.Language == s.Language).ToList());
+            var advice = RotationAdvice(rules, rotation);
             var key = string.Join("|", server.Running, server.Phase, server.PlayerCount, string.Join(",", server.Players), s.Name,
-                                  rules.Mode, rules.Roulette, rules.Lives, s.Port, s.Preset, ModReady);
+                                  rules.Mode, rules.Roulette, rules.Lives, s.Port, s.Preset, ModReady,
+                                  string.Join(",", rotation.Custom.Select(t => t.Title + ":" + t.Layout.Pages)), rotation.GameTexts,
+                                  string.Join(",", advice.Select(a => a.Text)));
             if (Equals(side.Tag, key)) return;  // unchanged: keep the buttons as they are (hover, clicks)
             side.Tag = key;
             side.Children.Clear();
@@ -337,6 +347,20 @@ namespace Lanppart3Launcher
                 side.Children.Add(Label("Le serveur tourne sans fenêtre. Il reste actif tant que le lanceur est ouvert " +
                                         "(sinon il n'est plus visible dans la liste des serveurs).", 15, "Muted", new Thickness(0, 12, 0, 0)));
             }
+
+            side.Children.Add(HLine(16, 10));
+            side.Children.Add(Label("Textes de la rotation", 18, "OptionCaption"));
+            foreach (var t in rotation.Custom)
+                side.Children.Add(Label("« " + t.Title + " » · " + Plural(t.Layout.Rounds.Count, "manche") + " · " +
+                                        Plural(t.Layout.Pages, "page"), 15, "CreamDim", new Thickness(0, 4, 0, 0)));
+            if (rotation.GameTexts > 0)
+                side.Children.Add(Label(Plural(rotation.GameTexts, "texte") + " du jeu · 1 page chacun", 15, "CreamDim",
+                                        new Thickness(0, 4, 0, 0)));
+            if (rotation.Custom.Count == 0 && rotation.GameTexts == 0)
+                side.Children.Add(Label("Aucun texte : le serveur prendra la sélection enregistrée du jeu.", 15, "Caption",
+                                        new Thickness(0, 4, 0, 0)));
+            foreach (var (text, warning) in advice)
+                side.Children.Add(Label((warning ? "Attention : " : "") + text, 14, warning ? "Caption" : "Muted", new Thickness(0, 8, 0, 0)));
         }
 
         void StartServer(ServerInstance server)
@@ -528,7 +552,8 @@ namespace Lanppart3Launcher
                         Children =
                         {
                             new TextBlock { Text = t.Title, FontSize = 18, TextWrapping = TextWrapping.Wrap },
-                            Label(t.Language + " · " + t.Rounds + " manches · difficulté " + t.Difficulty, 14, "Muted"),
+                            Label(t.Language + " · " + Plural(t.Layout.Rounds.Count, "manche") + " · " + Plural(t.Layout.Pages, "page") +
+                                  " · diff. " + t.Difficulty, 14, "Muted"),
                         },
                     },
                 };
@@ -569,6 +594,10 @@ namespace Lanppart3Launcher
                 editor.Children.Add(body);
                 o.Note("Une ligne contenant seulement *** sépare deux manches. Les lignes de plus de 48 caractères sont " +
                        "coupées automatiquement entre deux mots, comme celles des textes du jeu.");
+                var layout = new StackPanel();
+                editor.Children.Add(layout);
+                body.TextChanged += (x, e) => DescribeLayout(layout, body.Text);
+                DescribeLayout(layout, body.Text);
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(18, 6, 0, 0) };
                 buttons.Children.Add(Action("Enregistrer", (x, e) =>
                 {
@@ -594,6 +623,90 @@ namespace Lanppart3Launcher
                 editor.Children.Add(buttons);
             }
             ShowPage("texts", "Textes personnalisés", root, null);
+        }
+
+        static string Plural(int n, string word) => n + " " + word + (n > 1 ? "s" : "");
+
+        // Typing speed for the time estimates: 40 words (200 characters) per minute.
+        const double CharsPerSecond = 200 / 60.0;
+
+        // A custom text as the typewriter will show it (lines, rounds, pages), and what to watch for.
+        static void DescribeLayout(StackPanel panel, string body)
+        {
+            panel.Children.Clear();
+            var o = new OptionsBuilder(panel);
+            var l = TextLayout.Of(body);
+            if (l.Rounds.Count == 0) return;
+            panel.Children.Add(Label(Plural(l.Rounds.Count, "manche") + " · " + Plural(l.Lines, "ligne") + " à taper · " +
+                                     Plural(l.Pages, "page") + " (" + string.Join(" + ", l.PageRowCounts) + " lignes, " +
+                                     TextLayout.PageRows + " au plus par page)", 17, "Cream", new Thickness(18, 8, 0, 2)));
+            o.Note("Lignes par manche : " + string.Join(" · ", l.Rounds.Select(r => r.Count)) + ". Sur la page, une ligne vide " +
+                   "sépare deux manches. Manche la plus longue : environ " + (int)Math.Ceiling(l.LongestRoundChars / CharsPerSecond) +
+                   " s à taper à 40 mots par minute.");
+            if (l.Pages > 1)
+                o.Warning("ce texte tient sur " + l.Pages + " pages de machine à écrire. En K.O. et en Duel avec vies, la partie " +
+                          "passe d'une page à l'autre ; avec la roulette ou en Battle royale, seule la première page (" +
+                          Plural(l.PageRoundCounts[0], "manche") + ") est jouée.");
+            if (l.LongestRound > TextLayout.PageRows)
+                o.Warning("une manche fait " + l.LongestRound + " lignes, plus qu'une page : elle sera coupée en plusieurs manches.");
+            if (l.Replaced.Count > 0)
+                o.Note("Remplacés automatiquement (aucun clavier ne les tape) : " + string.Join(" ", l.Replaced) + ".");
+        }
+
+        // The texts a server draws from: its custom texts, and how many game texts.
+        sealed class Rotation
+        {
+            public List<CustomText> Custom;
+            public int GameTexts;
+        }
+
+        static Rotation RotationOf(ServerSettings s, List<GameText> catalog, List<CustomText> custom) => new Rotation
+        {
+            Custom = s.Texts == TextSource.CustomTexts || s.Texts == TextSource.Both ? custom
+                   : s.Texts == TextSource.Selection ? custom.Where(t => s.SelectedCustomTexts.Contains(t.File)).ToList()
+                   : new List<CustomText>(),
+            GameTexts = s.Texts == TextSource.GameTexts || s.Texts == TextSource.Both ? catalog.Count
+                      : s.Texts == TextSource.Selection ? catalog.Count(t => s.SelectedTextIds.Contains(t.Id)) : 0,
+        };
+
+        // Pages and rounds of a server's rotation, against its rules: (text, is a warning). Game texts fit on a
+        // page, about 5 rounds each.
+        static List<(string Text, bool Warning)> RotationAdvice(ServerSettings rules, Rotation rotation)
+        {
+            const int GameTextRounds = 5;
+            var advice = new List<(string Text, bool Warning)>();
+            var texts = rotation.Custom.Where(t => t.Layout.Rounds.Count > 0).Select(t => new { t.Title, Layout = t.Layout }).ToList();
+            int pages = rotation.GameTexts + texts.Sum(t => t.Layout.Pages);
+            int rounds = rotation.GameTexts * GameTextRounds + texts.Sum(t => t.Layout.Rounds.Count);
+            if (pages == 0) return advice;
+            advice.Add(("Pages de machine à écrire dans la rotation : " + pages + ".", false));
+            foreach (var t in texts.Where(t => t.Layout.Pages > 1))
+            {
+                if (rules.TurnsPages)
+                    advice.Add(("« " + t.Title + " » : " + t.Layout.Pages + " pages, jouées l'une après l'autre.", false));
+                else
+                    advice.Add(("« " + t.Title + " » fait " + t.Layout.Pages + " pages : " +
+                                (rules.Mode == GameMode.BattleRoyale ? "en Battle royale" : "sans les vies") + ", seule la première (" +
+                                Plural(t.Layout.PageRoundCounts[0], "manche") + ") est jouée.", true));
+            }
+            if (rules.TurnsPages)
+            {
+                int players = ServerSettings.Capacity(rules.Mode);
+                int maxRounds = players * rules.Lives - 1;
+                int needed = (int)Math.Ceiling(maxRounds / Math.Max(1.0, (double)rounds / pages));
+                advice.Add(("Avec les vies, la partie continue de page en page jusqu'au dernier survivant : la suite du texte, puis " +
+                            "les autres textes de la rotation. Au plus long (" + players + " joueurs × " + rules.Lives + " vies, une vie " +
+                            "perdue par manche) : " + maxRounds + " manches, soit environ " + Plural(needed, "page") + "." +
+                            (needed > pages ? " La rotation en a " + pages + " : ses textes reviendront." : ""), false));
+            }
+            foreach (var t in texts)
+            {
+                int seconds = (int)Math.Ceiling(t.Layout.LongestRoundChars / CharsPerSecond);
+                if (seconds > rules.RoundDuration)
+                    advice.Add(("« " + t.Title + " » a une manche de " + t.Layout.LongestRound + " lignes : environ " + seconds +
+                                " s à taper à 40 mots par minute, pour des manches de " + rules.RoundDuration + " s.", true));
+            }
+            return advice;
         }
     }
 }

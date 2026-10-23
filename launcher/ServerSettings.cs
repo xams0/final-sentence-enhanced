@@ -103,17 +103,15 @@ namespace Lanppart3Launcher
             foreach (var t in customTexts)
             {
                 sb.AppendLine("        { Id = " + t.Id + ", Title = " + LuaString(t.Title) + ", Difficulty = " + t.Difficulty +
-                              ", Body = " + LuaLongString(Typeable(t.Body)) + " },");
+                              ", Body = " + LuaLongString(TextLayout.Typeable(t.Body)) + " },");
             }
             sb.AppendLine("    },");
             sb.AppendLine("}");
             return sb.ToString();
         }
 
-        // Typographic characters a keyboard doesn't type (pasted from a word processor): their plain forms.
-        static string Typeable(string s) => (s ?? "")
-            .Replace('\u2019', '\'').Replace('\u2018', '\'').Replace('\u201C', '"').Replace('\u201D', '"')
-            .Replace("\u2026", "...").Replace('\u00A0', ' ').Replace('\u202F', ' ').Replace('\u2013', '-').Replace('\u2014', '-');
+        // K.O. and Duel with lives play page after page (the mod's pages.lua); otherwise a text plays its first page.
+        public bool TurnsPages => !Roulette && (Mode == GameMode.Knockdown || Mode == GameMode.Duel);
 
         internal static string LuaString(string s) =>
             "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n") + "\"";

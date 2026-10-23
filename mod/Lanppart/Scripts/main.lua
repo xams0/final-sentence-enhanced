@@ -33,9 +33,10 @@ local Texts = require("texts")
 
 local GI_STATE_MAINMENU = 2
 local isServer = Server.Init() ~= nil
-local Hud, Lobby, Menu, Browser
+local Hud, Lobby, Menu, Browser, Pages
 if not isServer then
     Hud = require("hud")
+    Pages = require("pages")
     Lobby = require("lobby")
     Menu = require("menu")
     Browser = require("browser")
@@ -78,6 +79,7 @@ local function OnGameThreadTick()
     Lobby.Tick(gi)
     Host.Tick()
     Hud.Tick()
+    Pages.ClientTick()
 end
 
 LoopAsync(500, function()

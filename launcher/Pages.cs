@@ -181,7 +181,7 @@ namespace Lanppart3Launcher
             }
             o.Section("Règles");
             o.Note("Règles du preset « " + PresetStore.Load(s.Preset).Name + " » : " +
-                   ModeNames[(int)rules.Mode] + ", " + (rules.Roulette ? "roulette" : rules.Lives + " vies") + ", bots : " +
+                   ModeNames[(int)rules.Mode] + ", " + rules.RulesText + ", bots : " +
                    (rules.FillWithBots ? "compléter les places" : rules.Bots.ToString()) + ". Elles se modifient dans SERVEUR › Presets Lanppart.");
             int preset = s.Preset;
             var edit = Action("Modifier ce preset", (x, e) => { selectedPreset = preset; GoTo(Tab.Server, "presets"); });
@@ -219,6 +219,35 @@ namespace Lanppart3Launcher
                 mistakes.ValueChanged += v => { s.MaxMistakesPerRound = v; save(); };
             }
 
+            if (s.Mode == GameMode.Knockdown)
+            {
+                o.Section("Coupe");
+                var cup = o.Row("Mode Coupe", OptionsBuilder.Check(s.Cup),
+                                "Comme la Coupe de Trackmania : personne n'est éliminé, chaque manche rapporte des points.");
+                cup.Click += (x, e) => { s.Cup = cup.IsChecked == true; save(); rebuild(); };
+                if (s.Cup)
+                {
+                    var points = o.Row("Points pour être finaliste", new Stepper(s.CupLimit, 10, 300, 10));
+                    points.ValueChanged += v => { s.CupPoints = v; save(); };
+                    o.Note("Chaque manche, dans l'ordre d'arrivée : 10, 6, 4, 3, 2 et 1 points (le dernier, coupé comme en " +
+                           "K.O., n'en marque pas). Un joueur qui atteint la limite devient finaliste ; un finaliste qui " +
+                           "termine ensuite une manche en premier remporte la coupe. Le texte continue de page en page.");
+                }
+            }
+            if (!s.IsCup) BuildRoulette(o, s, save, rebuild);  // (a cup has neither roulette nor lives)
+
+            o.Section("Durée");
+            var round = o.Row("Durée de la manche", new Stepper(s.RoundDuration, 30, 900, 10, Stepper.Duration));
+            round.ValueChanged += v => { s.RoundDuration = v; save(); rebuild(); };
+            if (s.Mode == GameMode.BattleRoyale)
+            {
+                var pause = o.Row("Durée de la pause", new Stepper(s.PauseDuration, 0, 60, 5, Stepper.Duration));
+                pause.ValueChanged += v => { s.PauseDuration = v; save(); };
+            }
+        }
+
+        void BuildRoulette(OptionsBuilder o, ServerSettings s, Action save, Action rebuild)
+        {
             o.Section("Roulette");
             var roulette = o.Row("Jouer à la roulette russe", OptionsBuilder.Check(s.Roulette));
             roulette.Click += (x, e) => { s.Roulette = roulette.IsChecked == true; save(); rebuild(); };
@@ -234,15 +263,6 @@ namespace Lanppart3Launcher
                 var lives = o.Row("Vies", new Stepper(s.Lives, 1, 6),
                                   "Chaque fois que le jeu déclencherait la roulette ou une élimination, le joueur perd une vie.");
                 lives.ValueChanged += v => { s.Lives = v; save(); rebuild(); };
-            }
-
-            o.Section("Durée");
-            var round = o.Row("Durée de la manche", new Stepper(s.RoundDuration, 30, 900, 10, Stepper.Duration));
-            round.ValueChanged += v => { s.RoundDuration = v; save(); rebuild(); };
-            if (s.Mode == GameMode.BattleRoyale)
-            {
-                var pause = o.Row("Durée de la pause", new Stepper(s.PauseDuration, 0, 60, 5, Stepper.Duration));
-                pause.ValueChanged += v => { s.PauseDuration = v; save(); };
             }
         }
 
@@ -324,7 +344,8 @@ namespace Lanppart3Launcher
                           (page.Length == 2 && page[1] != "1" ? " · page " + page[0] + " sur " + page[1] : "");
             }
             var key = string.Join("|", server.Running, server.Phase, server.PlayerCount, string.Join(",", server.Players), s.Name,
-                                  rules.Mode, rules.Roulette, rules.Lives, s.Port, s.Preset, ModReady, applied != null, pending, playing,
+                                  rules.Mode, rules.RulesText, s.Port, s.Preset, ModReady, applied != null, pending, playing,
+                                  string.Join(",", server.CupStandings),
                                   string.Join(",", rotation.Custom.Select(t => t.Title + ":" + t.Layout.Pages)), rotation.GameTexts,
                                   string.Join(",", advice.Select(a => a.Text)));
             if (Equals(side.Tag, key)) return;  // unchanged: keep the buttons as they are (hover, clicks)
@@ -334,13 +355,27 @@ namespace Lanppart3Launcher
             side.Children.Add(Label(server.PhaseText, 18, server.Running ? "CheckGreen" : "Muted", new Thickness(0, 4, 0, 0)));
             int capacity = ServerSettings.Capacity(rules.Mode);
             side.Children.Add(Label((s.Preset >= 0 ? PresetStore.Load(s.Preset).Name + " · " : "") + ModeNames[(int)rules.Mode] +
-                                    " · " + (rules.Roulette ? "roulette" : rules.Lives + " vies"), 16, "OptionLabel",
-                                    new Thickness(0, 4, 0, 0)));
+                                    " · " + rules.RulesText, 16, "OptionLabel", new Thickness(0, 4, 0, 0)));
             side.Children.Add(HLine(12, 12));
             if (server.Running)
             {
                 side.Children.Add(Label(server.PlayerCount + " / " + capacity + " joueurs", 18, "OptionCaption"));
                 foreach (var p in server.Players) side.Children.Add(Label("  " + p, 16, "CreamDim"));
+                var standings = server.CupStandings;
+                if (standings.Length > 0)
+                {
+                    side.Children.Add(Label("Classement de la coupe", 18, "OptionCaption", new Thickness(0, 12, 0, 2)));
+                    int rank = 0;
+                    foreach (var entry in standings)
+                    {
+                        var f = entry.Split(':');
+                        if (f.Length < 3) continue;
+                        rank++;
+                        var standing = f[2] == "W" ? "VAINQUEUR" : f[2] == "F" ? "finaliste" : f[1] + " pts";
+                        side.Children.Add(Label("  " + rank + ". " + f[0] + " · " + standing, 16,
+                                                f[2] == "-" ? "CreamDim" : "Caption"));
+                    }
+                }
                 side.Children.Add(Label("Adresses pour rejoindre :", 15, "Muted", new Thickness(0, 12, 0, 2)));
                 foreach (var ip in Discovery.LocalAddresses())
                     side.Children.Add(new TextBox
@@ -524,8 +559,8 @@ namespace Lanppart3Launcher
             root.Children.Add(body);
 
             side.Children.Add(Label(preset.Name, 23, "Cream"));
-            side.Children.Add(Label(ModeNames[(int)preset.Mode] + " · " + (preset.Roulette ? "roulette" : preset.Lives + " vies"),
-                                    16, "OptionLabel", new Thickness(0, 4, 0, 0)));
+            side.Children.Add(Label(ModeNames[(int)preset.Mode] + " · " + preset.RulesText, 16, "OptionLabel",
+                                    new Thickness(0, 4, 0, 0)));
             side.Children.Add(HLine(12, 12));
             side.Children.Add(Label("Les changements sont enregistrés tout de suite. Le jeu les prend en compte à son prochain " +
                                     "lancement en mode Lanppart3, les serveurs à leur prochaine partie.", 15, "CreamDim",
@@ -720,7 +755,10 @@ namespace Lanppart3Launcher
                                 (rules.Mode == GameMode.BattleRoyale ? "en Battle royale" : "sans les vies") + ", seule la première (" +
                                 Plural(t.Layout.PageRoundCounts[0], "manche") + ") est jouée.", true));
             }
-            if (rules.TurnsPages)
+            if (rules.IsCup)
+                advice.Add(("En Coupe, la partie continue de page en page jusqu'à ce qu'un finaliste gagne une manche : la suite " +
+                            "du texte, puis les autres textes de la rotation (ils reviennent si la coupe dure).", false));
+            else if (rules.TurnsPages)
             {
                 int players = ServerSettings.Capacity(rules.Mode);
                 int maxRounds = players * rules.Lives - 1;

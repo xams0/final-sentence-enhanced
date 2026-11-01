@@ -1,7 +1,7 @@
 -- Lobby options window (Partie personnalisée, Créer nouveau, lobby "Options") with the mod:
 --  * "Jouer à la roulette russe" can be changed in every mode. Unchecked, the "Vies" line replaces the
 --    revolver settings: each roulette or elimination of the game then costs a life (lanppart_native.c).
---  * Two presets are added to the mode list, Lanppart Poules and Lanppart Finales: complete rule sets
+--  * Three presets are added to the mode list, Lanppart Poules, Finales and Coupe: complete rule sets
 --    edited in the launcher (presets.lua). Choosing one fills the window with its rules and locks them.
 --
 -- The blueprint maps the mode list index straight to EPGTypeMode, so the presets are reported as their
@@ -52,7 +52,7 @@ local presetGuard = {}    -- type mode -> the player's saved options, kept while
 local pendingStamp = nil  -- rules of the options the window just produced (Créer / Appliquer)
 local hooksRegistered = false
 
--- "poules", "finales" or nil: the preset the lobby options were made with.
+-- "poules", "finales", "coupe" or nil: the preset the lobby options were made with.
 function Menu.IsLanppart(opts)
     if not opts.bIsPrivate then return nil end
     local index = Presets.FromMarker(opts.BotsCount, opts.TypeMode)
@@ -109,6 +109,7 @@ local function StateOf(w)
     if not state then
         state = {
             SlotsTitle = w.BulletSlotsStepper.TitleText:GetText(),
+            SlotsVisibility = w.BulletSlotsStepper:GetVisibility(),
             InitialBulletsVisibility = w.InitialBulletsStepper:GetVisibility(),
             RevolverDrumVisibility = w.RevolverDrum:GetVisibility(),
             Enabled = {},
@@ -245,6 +246,13 @@ Adjust = function(w)
         end
         Hearts.Show(state.Hearts, true)
         Hearts.Set(state.Hearts, slots.Stepper, slots.Stepper)
+    end
+    -- A cup (Lanppart Coupe) has neither roulette nor lives: no line for them.
+    if preset and preset.Rules.Cup then
+        if slots:GetVisibility() ~= VIS_COLLAPSED then slots:SetVisibility(VIS_COLLAPSED) end
+        Hearts.Show(state.Hearts, false)
+    elseif slots:GetVisibility() == VIS_COLLAPSED then
+        slots:SetVisibility(state.SlotsVisibility)
     end
     SetEnabled(slots, rulesEditable)
     SetEnabled(initial, rulesEditable and withRoulette)

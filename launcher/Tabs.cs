@@ -61,7 +61,7 @@ namespace Lanppart3Launcher
                             new Entry { Key = "servers", Title = "Mes serveurs", Run = ShowServersPage,
                                         Subtitle = "Héberger, régler, lancer les parties" },
                             new Entry { Key = "presets", Title = "Presets Lanppart", Run = ShowPresetsPage,
-                                        Subtitle = "Règles des Poules et des Finales" },
+                                        Subtitle = "Règles des Poules, des Finales et de la Coupe" },
                             new Entry { Key = "texts", Title = "Textes personnalisés", Run = () => ShowTextsPage(null),
                                         Subtitle = "Vos textes, gardés sur ce PC" },
                         } },
@@ -183,7 +183,7 @@ namespace Lanppart3Launcher
                     Caption("Mode Lanppart3");
                     Para("Lance le jeu avec le mod. Toute partie lancée depuis un lobby (Partie personnalisée, Créer nouveau) " +
                          "est hébergée par le PC de l'hôte du lobby au lieu des serveurs officiels. Les règles deviennent " +
-                         "libres : roulette russe ou vies dans tous les modes, presets Lanppart Poules et Lanppart Finales. " +
+                         "libres : roulette russe ou vies dans tous les modes, presets Lanppart Poules, Finales et Coupe. " +
                          "Tous les joueurs du lobby doivent lancer le jeu dans ce mode.");
                     break;
                 case "howto":
@@ -198,8 +198,20 @@ namespace Lanppart3Launcher
                          "fait apparaître la ligne Vies.");
                     Caption("Les vies");
                     Para("Chaque fois que le jeu déclencherait la roulette ou une élimination, le joueur perd une vie ; il " +
-                         "n'est éliminé qu'à 0. En K.O., le texte est rallongé (avec les autres textes choisis, ou répété) " +
-                         "pour que la partie dure jusqu'au dernier survivant.");
+                         "n'est éliminé qu'à 0. En K.O. et en Duel, la partie continue de page en page (la suite du texte, " +
+                         "puis les autres textes choisis) jusqu'au dernier survivant.");
+                    Caption("La Coupe");
+                    Para("Comme la Coupe de Trackmania, en K.O. : personne n'est éliminé. À chaque manche, l'ordre d'arrivée " +
+                         "rapporte 10, 6, 4, 3, 2 puis 1 points ; le dernier est coupé comme en K.O. et ne marque rien. Un " +
+                         "joueur qui atteint la limite de points devient finaliste. Un finaliste qui termine ensuite une " +
+                         "manche en premier remporte la coupe. Le classement est affiché à gauche de l'écran.");
+                    Caption("Pendant la partie");
+                    Para("En haut à droite, le fil des événements dit qui perd une vie, qui est éliminé et pourquoi (et, en " +
+                         "Coupe, qui gagne la manche ou devient finaliste). Il reste 10 secondes, puis revient au suivant.");
+                    Para("Éliminé, on passe en observation au bout de quelques secondes : la caméra suit un joueur encore en " +
+                         "lice, par-dessus son épaule, avec ses vies, sa manche, sa progression, ses fautes et la ligne qu'il " +
+                         "tape. Flèches gauche / droite : changer de joueur ; Espace : vue libre depuis sa chaise ; Échap : " +
+                         "quitter la partie.");
                     break;
                 case "hosting":
                     title = "Organiser une partie";
@@ -211,7 +223,7 @@ namespace Lanppart3Launcher
                     Para("Le serveur reste actif tant que le lanceur est ouvert. « Appliquer les réglages » vaut dès la " +
                          "prochaine partie ; « Nouvelle partie » en ouvre une tout de suite.");
                     Caption("Presets Lanppart");
-                    Para("« Lanppart Poules » et « Lanppart Finales » apparaissent dans « Mode de jeu » des lobbys en mode " +
+                    Para("« Lanppart Poules », « Lanppart Finales » et « Lanppart Coupe » apparaissent dans « Mode de jeu » des lobbys en mode " +
                          "Lanppart3 et dans les modes des serveurs. Le jeu les relit à chaque lancement : après un changement, " +
                          "relancez-le. Ce sont les presets de l'hôte du lobby qui comptent.");
                     Caption("Textes personnalisés");

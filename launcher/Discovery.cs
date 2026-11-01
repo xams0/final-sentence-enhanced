@@ -17,7 +17,7 @@ namespace Lanppart3Launcher
         public string Name;
         public GameMode Mode;
         public bool Roulette;
-        public int Lives;
+        public int Lives;          // negative: a cup, finalist at -Lives points
         public int Players;
         public int Capacity;
         public string Phase;
@@ -25,14 +25,14 @@ namespace Lanppart3Launcher
         public bool Manual;        // added by IP
 
         public string ModeText => Mode == GameMode.BattleRoyale ? "Battle royale" : Mode == GameMode.Knockdown ? "K.O." : "Duel";
-        public string RulesText => Roulette ? "Roulette" : "Vies : " + Lives;
+        public string RulesText => Lives < 0 ? "Coupe à " + -Lives + " pts" : Roulette ? "Roulette" : "Vies : " + Lives;
         public string PhaseText => Phase == "waiting" ? "En attente" : Phase == "playing" ? "En jeu" : Phase == "ended" ? "Fin de partie" :
                                    string.IsNullOrEmpty(Phase) ? "?" : "Démarrage";
     }
 
     // Lanppart3 servers announce themselves once a second with a UDP broadcast on every network interface,
     // Radmin VPN's included (its adapter is a 26.0.0.0/8 network): players' launchers and games listen for it.
-    //   LANPPART3|1|uid|port|mode|roulette|lives|players|capacity|phase|name
+    //   LANPPART3|1|uid|port|mode|roulette|lives|players|capacity|phase|name   (a cup: lives = -points limit)
     public static class Discovery
     {
         public const int Port = 47777;
@@ -43,7 +43,8 @@ namespace Lanppart3Launcher
             var st = s.Settings.Effective();
             var name = (st.Name ?? "").Replace("|", "/");
             var uid = (Environment.MachineName + "/" + s.Id).Replace("|", "/");
-            var msg = string.Join("|", Magic, "1", uid, st.Port, (int)st.Mode, st.Roulette ? 1 : 0, st.Lives, s.PlayerCount,
+            var msg = string.Join("|", Magic, "1", uid, st.Port, (int)st.Mode, st.Roulette && !st.IsCup ? 1 : 0,
+                                  st.IsCup ? -st.CupLimit : st.Lives, s.PlayerCount,
                                   ServerSettings.Capacity(st.Mode), s.Phase, name);
             return Encoding.UTF8.GetBytes(msg);
         }

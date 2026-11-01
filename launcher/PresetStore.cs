@@ -4,32 +4,47 @@ using System.Text;
 
 namespace Lanppart3Launcher
 {
-    // The two lobby presets of the game's mode list (Lanppart Poules, Lanppart Finales): their rules are set
+    // The lobby presets of the game's mode list (Lanppart Poules, Finales, Coupe): their rules are set
     // here and written to %APPDATA%\Lanppart3\presets.lua, which the mod reads when the game starts
     // (mod/Lanppart/Scripts/presets.lua). Only the rule fields of ServerSettings are used.
     public static class PresetStore
     {
-        public const int Count = 2;
-        static readonly string[] Keys = { "poules", "finales" };
+        public const int Count = 3;
+        static readonly string[] Keys = { "poules", "finales", "coupe" };
 
         static string Dir => Path.Combine(AppData.Root, "presets");
         static string PathOf(int index) => Path.Combine(Dir, Keys[index] + ".json");
         public static string LuaPath => Path.Combine(AppData.Root, "presets.lua");
 
-        public static ServerSettings Default(int index) => index == 0
-            ? new ServerSettings
+        public static ServerSettings Default(int index)
+        {
+            switch (index)
             {
-                Name = "Lanppart Poules", Mode = GameMode.BattleRoyale, Roulette = false, Lives = 3, BulletSlots = 6,
-                InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
-                MistakeBehaviour = 1, RoundDuration = 240, PauseDuration = 10,
+                case 0:
+                    return new ServerSettings
+                    {
+                        Name = "Lanppart Poules", Mode = GameMode.BattleRoyale, Roulette = false, Lives = 3, BulletSlots = 6,
+                        InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
+                        MistakeBehaviour = 1, RoundDuration = 240, PauseDuration = 10,
+                    };
+                case 1:
+                    return new ServerSettings
+                    {
+                        // Up to 8 players: the last of each paragraph loses a life, only the last life kills.
+                        Name = "Lanppart Finales", Mode = GameMode.Knockdown, Roulette = false, Lives = 3, BulletSlots = 6,
+                        InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
+                        MistakeBehaviour = 1, RoundDuration = 120, PauseDuration = 10,
+                    };
+                default:
+                    return new ServerSettings
+                    {
+                        // A cup as in Trackmania: points per round, finalists, the first finalist to win a round wins.
+                        Name = "Lanppart Coupe", Mode = GameMode.Knockdown, Roulette = false, Lives = 3, BulletSlots = 6,
+                        InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
+                        MistakeBehaviour = 1, RoundDuration = 120, PauseDuration = 10, Cup = true, CupPoints = 50,
+                    };
             }
-            : new ServerSettings
-            {
-                // Up to 8 players: the last of each paragraph loses a life, only the last life kills.
-                Name = "Lanppart Finales", Mode = GameMode.Knockdown, Roulette = false, Lives = 3, BulletSlots = 6,
-                InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
-                MistakeBehaviour = 1, RoundDuration = 120, PauseDuration = 10,
-            };
+        }
 
         public static ServerSettings Load(int index) =>
             File.Exists(PathOf(index)) ? ServerSettings.Load(PathOf(index)) : Default(index);
@@ -64,6 +79,7 @@ namespace Lanppart3Launcher
                               (p.FillWithBots ? -1 : p.Bots).ToString(inv) + ", BotsDifficulty = " + p.BotsDifficulty + ",");
                 sb.AppendLine("        MistakeBehaviour = " + p.MistakeBehaviour + ", CapitalsMatter = " + (p.CapitalsMatter ? "true" : "false") + ",");
                 sb.AppendLine("        RoundDuration = " + p.RoundDuration + ", PauseDuration = " + p.PauseDuration + ",");
+                sb.AppendLine("        Cup = " + (p.IsCup ? "true" : "false") + ", CupPoints = " + p.CupLimit + ",");
                 sb.AppendLine("    },");
             }
             sb.AppendLine("}");

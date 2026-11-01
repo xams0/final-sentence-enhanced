@@ -490,9 +490,18 @@ static void ResumeWriters(uint8_t* gs) {
     }
 }
 
+static volatile int g_cupMode = 0;  // Lanppart Coupe: lives mode where no life is ever lost (see the cup section)
+
 // Costs the writer a life; executes them (with deathResult) when it was their last one.
 static void LoseLife(uint8_t* gs, uint8_t* ps, float delay, uint8_t deathResult, int skipRound) {
     if (!ps || ps[OFF_PS_WRITERSTATE] == WS_Dead) return;
+    if (g_cupMode) {
+        // A cup costs no life: the writer only misses the rest of the round (and its points).
+        Log("Cup: writer %d misses the end of the round", *(int32_t*)(ps + OFF_PS_WRITERID));
+        if (skipRound) SkipRound(gs, ps);
+        else ContinueRound(gs, ps);
+        return;
+    }
     uint8_t* mask = ps + OFF_PS_DRUM_MASK;
     uint8_t chambers = ps[OFF_PS_DRUM_CHAMBERS];
     for (uint8_t i = 0; i < chambers; i++) {
@@ -643,6 +652,83 @@ static void OnTextFinished(uint8_t* gs, uint8_t* ps, char fromRoulette) {
     // The last one typing the round: a K.O. knockdown, a lost Duel round.
     LoseLife(gs, last, 0, TypeMode(gs) == TYPEMODE_Duel ? RESULT_SkipRouletteToExecute : RESULT_Knockdown, 1);
     WinIfLastOneLeft(gs, last);
+}
+
+// ---- Lanppart Coupe (cup, as in Trackmania) ----
+// K.O. rounds without eliminations. Each round, the writers score points by their finish order (10, 6, 4,
+// 3, 2, 1, then 0; the last one is cut off as in K.O. and scores nothing). Reaching the points limit makes a
+// writer a finalist; a finalist who then finishes a round first wins the cup, which ends the match. The
+// session runs in lives mode (rounds go on after a timeout or a knockdown, pages turn), but LoseLife never
+// costs a life.
+// A writer's cup standing is its replicated PlayerState Score, an exact integer in a float, which the
+// players' games read (cup.lua):
+//   bit 0 cup marker, bit 1 finalist, bit 2 winner, bits 3-12 points, bits 13-22 points limit.
+// The Lua host writes the marker and the limit into every writer's Score; points and flags come from here.
+typedef void (*CarriageChanged_t)(void* gs, void* ps, int32_t previous, int32_t carriage);
+#define RVA_CARRIAGE_CHANGED_CALL  0x42A1D46  // exec thunk of the game state's active player carriage handler
+#define RVA_CARRIAGE_CHANGED       0x42CDCE0  // ... the handler: round end, K.O. knockdown, text end
+#define OFF_PS_SCORE               0x2A8
+#define CUP_MARKER   1
+#define CUP_FINALIST 2
+#define CUP_WINNER   4
+#define CUP_MAX_ROUNDS 256
+
+static const int kCupPoints[] = { 10, 6, 4, 3, 2, 1 };
+static uint8_t* g_cupGs;                   // the session the finishes below belong to
+static int g_cupFinishes[CUP_MAX_ROUNDS];  // writers who finished each round of the page
+
+static int CupScore(uint8_t* ps) {
+    float s = *(float*)(ps + OFF_PS_SCORE);
+    return s > 0 ? (int)(s + 0.5f) : 0;
+}
+
+static void SetCupScore(uint8_t* ps, int score) {
+    *(float*)(ps + OFF_PS_SCORE) = (float)score;
+    ForceNetUpdate(ps);
+}
+
+static void CupResetFinishes(uint8_t* gs) {
+    g_cupGs = gs;
+    memset(g_cupFinishes, 0, sizeof(g_cupFinishes));
+}
+
+// The writer just finished their round. Returns 1 when they won the cup (the match is over).
+static int CupFinish(uint8_t* gs, uint8_t* ps) {
+    if (g_cupGs != gs) CupResetFinishes(gs);
+    int32_t round = *(int32_t*)(ps + OFF_PS_ROUND);
+    if (round < 0 || round >= CUP_MAX_ROUNDS) return 0;
+    int rank = g_cupFinishes[round]++;
+    int score = CupScore(ps);
+    int id = *(int32_t*)(ps + OFF_PS_WRITERID);
+    if (!(score & CUP_MARKER)) {
+        Log("Cup: writer %d has no cup standing yet (rank %d not counted)", id, rank + 1);
+        return 0;
+    }
+    int limit = (score >> 13) & 1023, points = (score >> 3) & 1023;
+    if (score & CUP_FINALIST) {
+        if (rank != 0) return 0;
+        SetCupScore(ps, score | CUP_WINNER);
+        Log("Cup: finalist %d finished round %d first and wins the cup", id, round + 1);
+        ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, ps, 0);
+        return 1;
+    }
+    points += rank < (int)(sizeof(kCupPoints) / sizeof(kCupPoints[0])) ? kCupPoints[rank] : 0;
+    if (points > 1023) points = 1023;
+    int finalist = points >= limit ? CUP_FINALIST : 0;
+    SetCupScore(ps, (score & ~((1023 << 3) | CUP_FINALIST)) | (points << 3) | finalist);
+    Log("Cup: writer %d finished round %d at rank %d: %d/%d points%s", id, round + 1, rank + 1, points, limit,
+        finalist ? ", finalist" : "");
+    return 0;
+}
+
+// Every carriage move of a writer: counts the round finishes of a cup, in their exact order, before the
+// game's handler (which sets the finisher waiting, knocks the last one down, or ends the text).
+static void OnCarriageChanged(uint8_t* gs, uint8_t* ps, int32_t previous, int32_t carriage) {
+    if (g_cupMode && ps && LivesActive(gs) && StillTyping(ps)) {
+        int32_t roundEnd = RoundEndCarriage(gs, ps);
+        if (roundEnd > 0 && carriage >= roundEnd && previous < roundEnd && CupFinish(gs, ps)) return;
+    }
+    ((CarriageChanged_t)AT(RVA_CARRIAGE_CHANGED))(gs, ps, previous, carriage);
 }
 
 // The game resolves a surviving roulette only for Battle Royale and Duel writers; a K.O. survivor would
@@ -952,6 +1038,7 @@ static int PatchLives(void) {
            RedirectCall(RVA_ROUND_TIMEOUT_CALL, RVA_EXECUTE_WRITER, (void*)&OnRoundLost, "Round timeout") &&
            RedirectCall(RVA_KO_KNOCKDOWN_CALL, RVA_EXECUTE_WRITER, (void*)&OnKnockdown, "K.O. knockdown") &&
            RedirectCall(RVA_TEXT_END_JUMP, RVA_WIN_MATCH, (void*)&OnTextFinished, "Text end") &&
+           RedirectCall(RVA_CARRIAGE_CHANGED_CALL, RVA_CARRIAGE_CHANGED, (void*)&OnCarriageChanged, "Round finishes") &&
            RedirectCall(RVA_MANDATORY_ADDBOT_CALL, RVA_ADD_BOT, (void*)&AddMandatoryBot, "Mandatory bots") &&
            RedirectCall(RVA_PRESPAWN_ADDBOT_CALL, RVA_ADD_BOT, (void*)&GameAddedBot, "Pre-spawned bots") &&
            RedirectCall(kScheduledAddBotJumps[0], RVA_ADD_BOT, (void*)&GameAddedBot, "Scheduled bots") &&
@@ -1316,6 +1403,7 @@ __declspec(dllexport) int lanppart_new_page(void* L) {
     if (!gs) return 0;
     TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
     int moved = 0;
+    CupResetFinishes(gs);  // (the page's rounds count from the first one again)
     for (int32_t i = 0; i < players->Num; i++) {
         uint8_t* ps = ((uint8_t**)players->Data)[i];
         if (!ps) continue;
@@ -1449,6 +1537,21 @@ __declspec(dllexport) int lanppart_lives_off(void* L) {
     (void)L;
     g_livesMode = 0;
     SetKnockdownFinal(0);
+    return 0;
+}
+
+// Lanppart Coupe for the next hosted session (with lives mode on): see CupFinish.
+__declspec(dllexport) int lanppart_cup_on(void* L) {
+    (void)L;
+    g_cupMode = 1;
+    g_cupGs = NULL;
+    Log("Cup mode on");
+    return 0;
+}
+
+__declspec(dllexport) int lanppart_cup_off(void* L) {
+    (void)L;
+    g_cupMode = 0;
     return 0;
 }
 

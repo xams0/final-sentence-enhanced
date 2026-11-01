@@ -33,10 +33,13 @@ local Texts = require("texts")
 
 local GI_STATE_MAINMENU = 2
 local isServer = Server.Init() ~= nil
-local Hud, Lobby, Menu, Browser, Pages
+local Hud, Lobby, Menu, Browser, Pages, Feed, Observe, Cup
 if not isServer then
     Hud = require("hud")
     Pages = require("pages")
+    Feed = require("feed")
+    Observe = require("observe")
+    Cup = require("cup")
     Lobby = require("lobby")
     Menu = require("menu")
     Browser = require("browser")
@@ -58,6 +61,8 @@ local function OnGameThreadTick()
     if gi.State == GI_STATE_MAINMENU and lastGiState ~= GI_STATE_MAINMENU then
         Native.DisableIris()
         Native.SetLives(false)
+        Native.SetCup(false)
+        require("cup").Limit = nil
         Host.LivesMode = false
         Host.OnDedicatedServer = false
     end
@@ -80,13 +85,35 @@ local function OnGameThreadTick()
     Host.Tick()
     Hud.Tick()
     Pages.ClientTick()
+    -- (Each one on its own: a failing panel leaves the others alone.)
+    for name, tick in pairs({ feed = Feed.Tick, observe = Observe.Tick, cup = Cup.ClientTick }) do
+        local ok, err = pcall(tick)
+        if not ok then print("[Lanppart] " .. name .. ": " .. tostring(err) .. "\n") end
+    end
 end
 
-LoopAsync(500, function()
-    ExecuteInGameThread(function()
+-- The mod's only loop, started here once: every 100 ms on the game thread, the animations and the observer
+-- view; every 500 ms, the rest. (Loops started while the game runs, from game-thread code, were followed
+-- by crashes in UE4SS's game-thread queue: animations and panels step from this one instead.)
+local fastTicks = isServer and {} or {
+    hearts = require("hearts").Animate, feed = Feed.Fade, observe = Observe.Fast,
+}
+local frame = 0
+
+local function OnFrame()
+    frame = frame + 1
+    if frame % 5 == 0 then
         local ok, err = pcall(OnGameThreadTick)
         if not ok then print("[Lanppart] " .. tostring(err) .. "\n") end
-    end)
+    end
+    for name, tick in pairs(fastTicks) do
+        local ok, err = pcall(tick)
+        if not ok then print("[Lanppart] " .. name .. ": " .. tostring(err) .. "\n") end
+    end
+end
+
+LoopAsync(100, function()
+    ExecuteInGameThread(OnFrame)
     return false
 end)
 

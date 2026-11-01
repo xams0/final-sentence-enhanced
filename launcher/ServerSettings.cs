@@ -37,6 +37,9 @@ namespace Lanppart3Launcher
         [DataMember] public int MaxMistakesPerRound = 3;
         [DataMember] public int RoundDuration = 120;
         [DataMember] public int PauseDuration = 10;
+        // Lanppart Coupe (K.O. only): points per round, finalist at CupPoints, a finalist winning a round wins.
+        [DataMember] public bool Cup;
+        [DataMember] public int CupPoints = 50;
         // A lobby preset (PresetStore) whose rules the server plays, or -1 for the rules above.
         [DataMember] public int Preset = -1;
 
@@ -51,8 +54,14 @@ namespace Lanppart3Launcher
             s.FillWithBots = p.FillWithBots; s.Bots = p.Bots; s.BotsDifficulty = p.BotsDifficulty;
             s.MistakeBehaviour = p.MistakeBehaviour; s.CapitalsMatter = p.CapitalsMatter;
             s.RoundDuration = p.RoundDuration; s.PauseDuration = p.PauseDuration;
+            s.Cup = p.Cup; s.CupPoints = p.CupPoints;
             return s;
         }
+
+        public bool IsCup => Cup && Mode == GameMode.Knockdown;
+        // (Settings saved before the cup existed read 0.)
+        public int CupLimit => CupPoints >= 10 ? Math.Min(CupPoints, 999) : 50;
+        public string RulesText => IsCup ? "coupe à " + CupLimit + " pts" : Roulette ? "roulette" : Lives + " vies";
 
         public static int Capacity(GameMode mode) => mode == GameMode.BattleRoyale ? 40 : mode == GameMode.Knockdown ? 8 : 2;
 
@@ -99,6 +108,7 @@ namespace Lanppart3Launcher
             sb.AppendLine("    Bots = " + (FillWithBots ? "\"fill\"" : Bots.ToString(inv)) + ", BotsDifficulty = " + BotsDifficulty + ",");
             sb.AppendLine("    MistakeBehaviour = " + MistakeBehaviour + ", CapitalsMatter = " + (CapitalsMatter ? "true" : "false") + ",");
             sb.AppendLine("    RoundDuration = " + RoundDuration + ", PauseDuration = " + PauseDuration + ",");
+            if (IsCup) sb.AppendLine("    Cup = true, CupPoints = " + CupLimit + ",");
             sb.AppendLine("    TextIds = { " + string.Join(", ", gameTextIds) + " },");
             sb.AppendLine("    Texts = {");
             foreach (var t in customTexts)
@@ -111,8 +121,9 @@ namespace Lanppart3Launcher
             return sb.ToString();
         }
 
-        // K.O. and Duel with lives play page after page (the mod's pages.lua); otherwise a text plays its first page.
-        public bool TurnsPages => !Roulette && (Mode == GameMode.Knockdown || Mode == GameMode.Duel);
+        // K.O. and Duel with lives, and the cup, play page after page (the mod's pages.lua); otherwise a text plays
+        // its first page.
+        public bool TurnsPages => (IsCup || !Roulette) && (Mode == GameMode.Knockdown || Mode == GameMode.Duel);
 
         internal static string LuaString(string s) =>
             "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n") + "\"";
@@ -151,6 +162,8 @@ namespace Lanppart3Launcher
             rules.Lives = Int("Lives", rules.Lives);
             rules.RoundDuration = Int("RoundDuration", rules.RoundDuration);
             rules.Roulette = Regex.IsMatch(lua, @"\bRoulette = true");
+            rules.Cup = Regex.IsMatch(lua, @"\bCup = true");
+            rules.CupPoints = Int("CupPoints", rules.CupPoints);
             var ids = Regex.Match(lua, @"\bTextIds = \{([^}]*)\}");
             if (ids.Success)
                 foreach (Match id in Regex.Matches(ids.Groups[1].Value, @"\d+")) session.GameTextIds.Add(int.Parse(id.Value, CultureInfo.InvariantCulture));

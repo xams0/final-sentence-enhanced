@@ -3,6 +3,7 @@
 -- (own lives, other modes), and in the scoreboard / match results rows.
 local Host = require("host")
 local Hearts = require("hearts")
+local Cup = require("cup")
 
 local Hud = {}
 
@@ -14,6 +15,17 @@ local BULLETS_WIDGET = "/Game/TheEnd/ui/interfaces/gameplay/tabmenu/wbp_gameplay
 local TABMENU_ENTRY = "/Game/TheEnd/ui/interfaces/gameplay/tabmenu/wbp_gameplay_tabmenu_entry.wbp_gameplay_tabmenu_entry_C"
 
 local function Valid(o) return o and o:IsValid() end
+
+-- Lives are shown as hearts in sessions with lives, except a cup (nobody loses a life there).
+local cupCheck, cupSeen = 0, false
+local function LivesShown()
+    if not Host.LivesMode then return false end
+    if os.clock() - cupCheck > 1 then
+        local gs = FindFirstOf("PGGameplayGameState")
+        cupCheck, cupSeen = os.clock(), Valid(gs) and Cup.Active(gs)
+    end
+    return not cupSeen
+end
 
 local function SetText(textBlock, wanted)
     if not Valid(textBlock) then return end
@@ -106,14 +118,14 @@ end
 
 -- Match results: from the row's bullets (lost lives). (The scoreboard's rows are handled below.)
 local function OnBulletsUpdated(widget)
-    if not Host.LivesMode or widget:GetFullName():find("tabmenu_entry", 1, true) then return end
+    if not (Valid(widget) and LivesShown()) or widget:GetFullName():find("tabmenu_entry", 1, true) then return end
     local total = SessionLives()
     if total then ShowHearts(widget, total - widget.Bullets, total) end
 end
 
 -- Scoreboard: from the row's player; an empty row shows nothing.
 local function OnEntryUpdated(entry, ps)
-    if not (Host.LivesMode and Valid(entry.wbp_gameplay_tabmenu_bullets)) then return end
+    if not (Valid(entry) and LivesShown() and Valid(entry.wbp_gameplay_tabmenu_bullets)) then return end
     if Valid(ps) then
         ShowHearts(entry.wbp_gameplay_tabmenu_bullets, Hearts.LivesOf(ps))
     else
@@ -236,12 +248,13 @@ function Hud.Tick()
     if not Valid(gs) then return end
     local hud = FindFirstOf("wbp_hud_gameplay_C")
     if not (Valid(hud) and Valid(hud.PlayerState)) then return end
+    -- The revolver drums would show the lost lives as loaded chambers (a cup's session has them too).
+    Hide(hud.CylinderAssembly)
+    Hide(hud.CylinderAssemblyRight)
+    if not LivesShown() then return end
     local duel = gs.GameplayOptions.TypeMode == TYPEMODE_DUEL
     SetUpHud(hud, duel)
     ShowLivesHeader(hud)
-    -- The revolver drums would show the lost lives as loaded chambers.
-    Hide(hud.CylinderAssembly)
-    Hide(hud.CylinderAssemblyRight)
     local lost
     if duel then
         lost = DuelName(hud.DuelPlayerName_Left, duelLeft, hud.PlayerState)

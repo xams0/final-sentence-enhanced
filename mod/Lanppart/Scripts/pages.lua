@@ -143,6 +143,29 @@ function Pages.ServerTick(gm, gs, pool)
     if alive >= 2 and done then TurnPage(gm, pool) end
 end
 
+-- The match progress bar at the top of the screen keeps what it was set up with for the first page: its
+-- length, rounds and stage points. On a longer page the pins and the leader's flag went past its end. Set
+-- it up again for the new page (it makes its stage points and the other players' pins again).
+local function ResetProgress()
+    for _, hud in ipairs(FindAllOf("wbp_hud_gameplay_C") or {}) do
+        local canvas = hud:IsValid() and hud.ProgressCanvas
+        if canvas and canvas:IsValid() then
+            for i = canvas:GetChildrenCount() - 1, 0, -1 do
+                local child = canvas:GetChildAt(i)
+                local class = child:IsValid() and child:GetClass():GetFName():ToString() or ""
+                if class:find("matchprogress_stagepoint", 1, true) or class:find("matchprogress_otherplayerpin", 1, true) then
+                    child:RemoveFromParent()
+                end
+            end
+            hud.StagePoints:Empty()
+            hud:InitializeProgress()
+            hud:InitializeRounds()
+            print(string.format("[Lanppart] progress bar set up for the new page (%d characters, %d rounds)\n",
+                hud.TextToTypeLen, hud.TotalRounds))
+        end
+    end
+end
+
 -- Players: when the session text changes during a game, the typewriter keeps its page: clear it and
 -- draw the new text.
 local function Redraw()
@@ -167,6 +190,7 @@ local function Redraw()
             tw:OnOriginalTextIsReady()
         end
     end
+    ResetProgress()
     print("[Lanppart] new page drawn\n")
 end
 

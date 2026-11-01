@@ -1,4 +1,4 @@
--- The lobby presets added to the mode list ("Lanppart Poules", "Lanppart Finales"): complete rule sets
+-- The lobby presets added to the mode list ("Lanppart Poules", "Lanppart Finales", "Lanppart Coupe"): complete rule sets
 -- edited in the launcher, which writes %APPDATA%\Lanppart3\presets.lua. Read when the game starts.
 --
 -- A lobby made with a preset carries it in BotsCount (never a real count): the members' windows show the
@@ -19,6 +19,11 @@ local DEFAULTS = {
     { Key = "finales", Name = "Lanppart Finales", Mode = TYPEMODE_KNOCKDOWN, Roulette = false, Lives = 3,
       BulletSlots = 6, InitialBullets = 1, MaxMistakesPerRound = 3, Bots = 0, BotsDifficulty = 2,
       MistakeBehaviour = 1, CapitalsMatter = false, RoundDuration = 120, PauseDuration = 10 },
+    -- A cup as in Trackmania (cup.lua): points per round, finalists, the first finalist to win a round wins.
+    { Key = "coupe", Name = "Lanppart Coupe", Mode = TYPEMODE_KNOCKDOWN, Roulette = false, Lives = 3,
+      BulletSlots = 6, InitialBullets = 1, MaxMistakesPerRound = 3, Bots = 0, BotsDifficulty = 2,
+      MistakeBehaviour = 1, CapitalsMatter = false, RoundDuration = 120, PauseDuration = 10,
+      Cup = true, CupPoints = 50 },
 }
 
 local function Clamp(v, lo, hi, default)
@@ -32,6 +37,7 @@ local function Checked(p, default)
     p = type(p) == "table" and p or {}
     local mode = Clamp(p.Mode, 0, 2, default.Mode)
     local slots = Clamp(p.BulletSlots, 1, 6, default.BulletSlots)
+    local cup = mode == TYPEMODE_KNOCKDOWN and (p.Cup == true or (p.Cup == nil and default.Cup == true))
     return {
         Key = default.Key,
         Name = (type(p.Name) == "string" and p.Name ~= "") and p.Name or default.Name,
@@ -47,6 +53,8 @@ local function Checked(p, default)
         CapitalsMatter = p.CapitalsMatter == true,
         RoundDuration = Clamp(p.RoundDuration, 10, 3600, default.RoundDuration),
         PauseDuration = Clamp(p.PauseDuration, 0, 600, default.PauseDuration),
+        Cup = cup or nil,  -- (K.O. only: no roulette, no life lost)
+        CupPoints = Clamp(p.CupPoints, 10, 999, default.CupPoints or 50),
     }
 end
 
@@ -92,9 +100,9 @@ function Presets.Stamp(opts, index)
     opts.BotsDifficulty = p.BotsDifficulty
     opts.MistakeBehaviour = p.MistakeBehaviour
     opts.bCapitalsMatter = p.CapitalsMatter
-    opts.bPlayRoulette = p.Roulette
-    opts.BulletSlotsNum = p.Roulette and p.BulletSlots or p.Lives
-    opts.InitialBulletsNum = p.Roulette and p.InitialBullets or 0
+    opts.bPlayRoulette = p.Roulette and not p.Cup
+    opts.BulletSlotsNum = opts.bPlayRoulette and p.BulletSlots or p.Lives
+    opts.InitialBulletsNum = opts.bPlayRoulette and p.InitialBullets or 0
     opts.RoundDuration = p.RoundDuration
     if p.Mode == TYPEMODE_BATTLEROYAL then
         opts.MaxMistakesPerRound = p.MaxMistakesPerRound

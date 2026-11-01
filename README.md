@@ -6,7 +6,12 @@ aux règles libres, en LAN ou via Radmin VPN.
 - **Serveurs dédiés** pilotés depuis le lanceur (sans fenêtre, plusieurs à la fois), ou lobby hébergé
   par l'hôte.
 - **Roulette russe ou vies** dans tous les modes (Battle royale, K.O., Duel), affichées en cœurs.
-- **Presets de lobby** (Lanppart Poules, Lanppart Finales) entièrement réglables dans le lanceur.
+- **Lanppart Coupe**, comme la Coupe de Trackmania : des points à chaque manche selon l'ordre d'arrivée,
+  des finalistes, et le premier finaliste à gagner une manche remporte la coupe.
+- **Fil des événements** en haut à droite : vies perdues, éliminations et leur cause, vainqueurs.
+- **Mode observation** : éliminé, on suit les joueurs encore en lice, par-dessus leur épaule, avec la
+  ligne qu'ils tapent.
+- **Presets de lobby** (Lanppart Poules, Finales, Coupe) entièrement réglables dans le lanceur.
 - **Textes personnalisés** gardés sur le serveur : les joueurs les découvrent en jouant.
 - **Liste des serveurs** du réseau local dans le lanceur et dans le jeu.
 
@@ -72,8 +77,8 @@ UE4SS_DIR=/chemin/vers/ue4ss ZIG=/chemin/vers/zig.exe mod/package.sh
 
 ## Publier une version
 
-1. Monter `<Version>` dans `launcher/Lanppart3Launcher.csproj` (ex. `3.1.0`).
-2. `mod/package.sh`, puis `tools/release.sh` : crée la release `v3.1.0` sur GitHub avec le lanceur.
+1. Monter `<Version>` dans `launcher/Lanppart3Launcher.csproj` (ex. `4.0.0`).
+2. `mod/package.sh`, puis `tools/release.sh` : crée la release `v4.0.0` sur GitHub avec le lanceur.
 
 Les lanceurs déjà installés la détectent et proposent de l'installer.
 

@@ -54,6 +54,8 @@ namespace Lanppart3Launcher
         // The text of the game waiting or in progress, and its page ("2/3").
         public int PlayingTextId => Status.TryGetValue("text", out var t) && int.TryParse(t, out var id) ? id : 0;
         public string PlayingPage => Status.TryGetValue("page", out var p) ? p : "";
+        // A cup's standings, best first: "name:points:W|F|-" (winner, finalist).
+        public string[] CupStandings => Status.TryGetValue("cup", out var c) && c.Length > 0 ? c.Split('\t') : new string[0];
 
         public string PhaseText
         {

@@ -4,6 +4,7 @@ local Native = require("native")
 local Texts = require("texts")
 local Presets = require("presets")
 local Pages = require("pages")
+local Cup = require("cup")
 
 local Host = {}
 
@@ -99,19 +100,25 @@ end
 -- trigger of the game fires, and lanppart_native.dll turns each one into a lost life.
 -- Automatic bot counts (-1, Duel / K.O.) fill the lobby's free places: the game would otherwise count
 -- only the host, then give the members joining afterwards no room.
--- Returns the options and whether the session plays with lives.
+-- A preset with the cup (Lanppart Coupe) is a K.O. with lives where no life is lost (cup.lua).
+-- Returns the options, whether the session plays with lives, and the cup's points limit (or nil).
 function Host.SessionOptions(lobbyOptions, members, capacity)
     local o = Host.CopyOptions(lobbyOptions)
     local preset, presetBots = Presets.FromMarker(o.BotsCount, o.TypeMode)
     if preset then o.BotsCount = presetBots end  -- (-1: fill the free places, below)
     if o.BotsCount < 0 and members and capacity then o.BotsCount = math.max(0, capacity - members) end
+    local cup = preset and Presets.List[preset].Cup and Presets.List[preset].CupPoints or nil
+    if cup then
+        o.TypeMode = TYPEMODE_KNOCKDOWN
+        o.bPlayRoulette = false
+    end
     local lives = not o.bPlayRoulette
     if lives then
         o.bPlayRoulette = true
         o.BulletSlotsNum = math.max(1, math.min(6, math.floor(o.BulletSlotsNum)))
         o.InitialBulletsNum = 0
     end
-    return o, lives
+    return o, lives, cup
 end
 
 -- Ctrl+F8 shortcut: a duel with lives, no bots.
@@ -126,8 +133,8 @@ function Host.FinalesOptions(base, lives)
     return Host.SessionOptions(o)
 end
 
--- Hosts a session with options from Host.SessionOptions.
-function Host.Start(o, lives)
+-- Hosts a session with options from Host.SessionOptions. cup: the points limit of a cup, or nil.
+function Host.Start(o, lives, cup)
     local ids = {}
     for _, id in ipairs(o.TextIds) do
         if id > 0 then ids[#ids + 1] = id end
@@ -141,8 +148,11 @@ function Host.Start(o, lives)
         return false
     end
     o.TextId = ids[math.random(#ids)]
-    Host.LivesMode = lives and true or false
+    Host.LivesMode = (lives or cup) and true or false
     Native.SetLives(Host.LivesMode)
+    Cup.Limit = cup and Cup.ClampLimit(cup) or nil
+    Native.SetCup(Cup.Limit ~= nil)
+    if Cup.Limit then print(string.format("[Lanppart] cup: finalist at %d points\n", Cup.Limit)) end
     Native.EnableIris()
     -- Iris' actor bridge reads the driver's world while the host tears the map down; with this off
     -- it never does (all our replicated actors live in the persistent level anyway).
@@ -154,9 +164,20 @@ function Host.Start(o, lives)
     return true
 end
 
--- Test shortcut: Finales from the player's saved Duel lobby settings.
+-- Test shortcut: Finales from the player's saved Duel lobby settings. (Dev: LANPPART3_DEV_PRESET=n hosts the
+-- options of a lobby made with preset n instead, with LANPPART3_DEV_BOTS bots and LANPPART3_DEV_CUP points.)
 function Host.StartFinales()
     local saved = {}
+    local preset = tonumber(os.getenv("LANPPART3_DEV_PRESET") or "")
+    if preset and Presets.List[preset] then
+        FindFirstOf("PGSaveGame"):GetGameplayOptionsForMode(Presets.List[preset].Mode, saved)
+        local o = Host.CopyOptions(saved)
+        Presets.Stamp(o, preset)
+        local options, lives, cup = Host.SessionOptions(o, 1, 8)
+        options.BotsCount = tonumber(os.getenv("LANPPART3_DEV_BOTS") or "") or options.BotsCount
+        cup = cup and (tonumber(os.getenv("LANPPART3_DEV_CUP") or "") or cup)
+        return Host.Start(options, lives, cup)
+    end
     FindFirstOf("PGSaveGame"):GetGameplayOptionsForMode(TYPEMODE_DUEL, saved)
     return Host.Start(Host.FinalesOptions(saved, Config.FinalesLives))
 end
@@ -210,6 +231,7 @@ function Host.Tick()
     local gs = FindFirstOf("PGGameplayGameState")
     if not (gs and gs:IsValid()) then return end
     Native.RefreshOwnership()
+    Cup.HostTick(gs)
     Native.ServerTick()
     ProvideText(gm, gs)
     Pages.ServerTick(gm, gs, TextPool)

@@ -78,7 +78,7 @@ local function NextTextId()
     return table.remove(textQueue)
 end
 
--- The session's options, whether it plays with lives, and its cup's points limit (a cup is a K.O.).
+-- The session's options, whether it plays with lives, its cup's points limit (a cup is a K.O.) and winners.
 local function SessionOptions()
     local s = settings
     local cup = s.Cup and s.Mode == TYPEMODE_KNOCKDOWN
@@ -101,15 +101,15 @@ local function SessionOptions()
     -- Every place is free for players until the start; the bots get the bot names of a full session.
     o.BotsCount = (CAPACITY[s.Mode] or 2) - 1
     local options, lives = Host.SessionOptions(o)
-    return options, lives, cup and (s.CupPoints or 50) or nil
+    return options, lives, cup and (s.CupPoints or 50) or nil, s.CupWinners or 1
 end
 
 local function OpenSession()
     sessionNumber = sessionNumber + 1
-    local o, lives, cup = SessionOptions()
+    local o, lives, cup, winners = SessionOptions()
     Log(string.format("opening session %d (mode %d, text %s%s)", sessionNumber, o.TypeMode, tostring(o.TextIds[1]),
-        cup and (", cup " .. cup .. " points") or ""))
-    if Host.Start(o, lives, cup) then SetPhase("hosting") end
+        cup and (", cup " .. cup .. " points, " .. winners .. " winner(s)") or ""))
+    if Host.Start(o, lives, cup, winners) then SetPhase("hosting") end
 end
 
 local function GameMode()

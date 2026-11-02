@@ -55,7 +55,8 @@ local function Watch(ps, typeMode, livesMode, cup)
     if standing and before.Standing then
         local gained = standing.Points - before.Standing.Points
         if standing.Winner and not before.Standing.Winner then
-            Add(name .. " remporte la coupe !", UI.GOLD)
+            Add(standing.Winners > 1 and string.format("%s est %s vainqueur de la coupe !", name, Cup.PlaceText(standing.Place))
+                or (name .. " remporte la coupe !"), UI.GOLD)
         elseif standing.Finalist and not before.Standing.Finalist then
             Add(string.format("%s est finaliste ! (%d pts)", name, standing.Points), UI.ORANGE)
         elseif gained == Cup.POINTS[1] then

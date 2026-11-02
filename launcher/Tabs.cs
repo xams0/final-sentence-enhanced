@@ -204,7 +204,9 @@ namespace Lanppart3Launcher
                     Para("Comme la Coupe de Trackmania, en K.O. : personne n'est éliminé. À chaque manche, l'ordre d'arrivée " +
                          "rapporte 10, 6, 4, 3, 2 puis 1 points ; le dernier est coupé comme en K.O. et ne marque rien. Un " +
                          "joueur qui atteint la limite de points devient finaliste. Un finaliste qui termine ensuite une " +
-                         "manche en premier remporte la coupe. Le classement est affiché à gauche de l'écran.");
+                         "manche en premier devient vainqueur. On choisit le nombre de vainqueurs (1 par défaut) : les vainqueurs " +
+                         "continuent d'écrire sans prendre de place à l'arrivée, et la coupe s'arrête quand elle les a tous. " +
+                         "Le classement est affiché à gauche de l'écran.");
                     Caption("Pendant la partie");
                     Para("En haut à droite, le fil des événements dit qui perd une vie, qui est éliminé et pourquoi (et, en " +
                          "Coupe, qui gagne la manche ou devient finaliste). Il reste 10 secondes, puis revient au suivant.");

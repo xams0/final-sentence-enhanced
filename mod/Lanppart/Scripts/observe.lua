@@ -235,7 +235,7 @@ local function Fill(gs, ps, cup)
                     ps.Mistakes .. (ps.Mistakes == 1 and " faute" or " fautes"), STATES[ps.WriterState] or "" }
     local standing = cup and Cup.Decode(ps)
     if standing then
-        table.insert(parts, 1, standing.Winner and "VAINQUEUR" or standing.Finalist and "FINALISTE" or (standing.Points .. " pts"))
+        table.insert(parts, 1, standing.Winner and (standing.Winners > 1 and "VAINQUEUR " .. Cup.PlaceText(standing.Place) or "VAINQUEUR") or standing.Finalist and "FINALISTE" or (standing.Points .. " pts"))
     end
     UI.SetText(p.Info, table.concat(parts, "  ·  "))
     UI.SetText(p.Typed, typed)

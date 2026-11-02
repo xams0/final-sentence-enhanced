@@ -38,10 +38,10 @@ namespace Lanppart3Launcher
                 default:
                     return new ServerSettings
                     {
-                        // A cup as in Trackmania: points per round, finalists, the first finalist to win a round wins.
+                        // A cup as in Trackmania: points per round, finalists, a finalist winning a round is a winner.
                         Name = "Lanppart Coupe", Mode = GameMode.Knockdown, Roulette = false, Lives = 3, BulletSlots = 6,
                         InitialBullets = 1, MaxMistakesPerRound = 3, FillWithBots = false, Bots = 0, BotsDifficulty = 2,
-                        MistakeBehaviour = 1, RoundDuration = 120, PauseDuration = 10, Cup = true, CupPoints = 50,
+                        MistakeBehaviour = 1, RoundDuration = 120, PauseDuration = 10, Cup = true, CupPoints = 50, CupWinners = 1,
                     };
             }
         }
@@ -79,7 +79,8 @@ namespace Lanppart3Launcher
                               (p.FillWithBots ? -1 : p.Bots).ToString(inv) + ", BotsDifficulty = " + p.BotsDifficulty + ",");
                 sb.AppendLine("        MistakeBehaviour = " + p.MistakeBehaviour + ", CapitalsMatter = " + (p.CapitalsMatter ? "true" : "false") + ",");
                 sb.AppendLine("        RoundDuration = " + p.RoundDuration + ", PauseDuration = " + p.PauseDuration + ",");
-                sb.AppendLine("        Cup = " + (p.IsCup ? "true" : "false") + ", CupPoints = " + p.CupLimit + ",");
+                sb.AppendLine("        Cup = " + (p.IsCup ? "true" : "false") + ", CupPoints = " + p.CupLimit +
+                              ", CupWinners = " + p.CupWinnerCount + ",");
                 sb.AppendLine("    },");
             }
             sb.AppendLine("}");

@@ -19,11 +19,12 @@ local DEFAULTS = {
     { Key = "finales", Name = "Lanppart Finales", Mode = TYPEMODE_KNOCKDOWN, Roulette = false, Lives = 3,
       BulletSlots = 6, InitialBullets = 1, MaxMistakesPerRound = 3, Bots = 0, BotsDifficulty = 2,
       MistakeBehaviour = 1, CapitalsMatter = false, RoundDuration = 120, PauseDuration = 10 },
-    -- A cup as in Trackmania (cup.lua): points per round, finalists, the first finalist to win a round wins.
+    -- A cup as in Trackmania (cup.lua): points per round, finalists, a finalist winning a round is a winner;
+    -- the cup ends with CupWinners winners.
     { Key = "coupe", Name = "Lanppart Coupe", Mode = TYPEMODE_KNOCKDOWN, Roulette = false, Lives = 3,
       BulletSlots = 6, InitialBullets = 1, MaxMistakesPerRound = 3, Bots = 0, BotsDifficulty = 2,
       MistakeBehaviour = 1, CapitalsMatter = false, RoundDuration = 120, PauseDuration = 10,
-      Cup = true, CupPoints = 50 },
+      Cup = true, CupPoints = 50, CupWinners = 1 },
 }
 
 local function Clamp(v, lo, hi, default)
@@ -54,7 +55,8 @@ local function Checked(p, default)
         RoundDuration = Clamp(p.RoundDuration, 10, 3600, default.RoundDuration),
         PauseDuration = Clamp(p.PauseDuration, 0, 600, default.PauseDuration),
         Cup = cup or nil,  -- (K.O. only: no roulette, no life lost)
-        CupPoints = Clamp(p.CupPoints, 10, 999, default.CupPoints or 50),
+        CupPoints = Clamp(p.CupPoints, 10, 500, default.CupPoints or 50),
+        CupWinners = Clamp(p.CupWinners, 1, 7, default.CupWinners or 1),
     }
 end
 

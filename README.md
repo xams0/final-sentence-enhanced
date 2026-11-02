@@ -7,7 +7,7 @@ aux règles libres, en LAN ou via Radmin VPN.
   par l'hôte.
 - **Roulette russe ou vies** dans tous les modes (Battle royale, K.O., Duel), affichées en cœurs.
 - **Lanppart Coupe**, comme la Coupe de Trackmania : des points à chaque manche selon l'ordre d'arrivée,
-  des finalistes, et le premier finaliste à gagner une manche remporte la coupe.
+  des finalistes ; un finaliste qui gagne une manche devient vainqueur, avec un nombre de vainqueurs au choix.
 - **Fil des événements** en haut à droite : vies perdues, éliminations et leur cause, vainqueurs.
 - **Mode observation** : éliminé, on suit les joueurs encore en lice, par-dessus leur épaule, avec la
   ligne qu'ils tapent.

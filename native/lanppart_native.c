@@ -657,13 +657,16 @@ static void OnTextFinished(uint8_t* gs, uint8_t* ps, char fromRoulette) {
 // ---- Lanppart Coupe (cup, as in Trackmania) ----
 // K.O. rounds without eliminations. Each round, the writers score points by their finish order (10, 6, 4,
 // 3, 2, 1, then 0; the last one is cut off as in K.O. and scores nothing). Reaching the points limit makes a
-// writer a finalist; a finalist who then finishes a round first wins the cup, which ends the match. The
-// session runs in lives mode (rounds go on after a timeout or a knockdown, pages turn), but LoseLife never
-// costs a life.
+// writer a finalist; a finalist who then finishes a round first becomes a winner (1st, 2nd...). The cup
+// ends the match once it has its number of winners (or one writer is left to win). Winners go on typing
+// the rounds, but no longer take a place in the finish order. The session runs in lives mode (rounds go on
+// after a timeout or a knockdown, pages turn), but LoseLife never costs a life.
 // A writer's cup standing is its replicated PlayerState Score, an exact integer in a float, which the
 // players' games read (cup.lua):
-//   bit 0 cup marker, bit 1 finalist, bit 2 winner, bits 3-12 points, bits 13-22 points limit.
-// The Lua host writes the marker and the limit into every writer's Score; points and flags come from here.
+//   bit 0 cup marker, bit 1 finalist, bit 2 winner, bits 3-11 points (a winner: its place),
+//   bits 12-20 points limit, bits 21-23 number of winners of the cup.
+// The Lua host writes the marker, the limit and the winners into every writer's Score; points, places and
+// flags come from here.
 typedef void (*CarriageChanged_t)(void* gs, void* ps, int32_t previous, int32_t carriage);
 #define RVA_CARRIAGE_CHANGED_CALL  0x42A1D46  // exec thunk of the game state's active player carriage handler
 #define RVA_CARRIAGE_CHANGED       0x42CDCE0  // ... the handler: round end, K.O. knockdown, text end
@@ -671,6 +674,10 @@ typedef void (*CarriageChanged_t)(void* gs, void* ps, int32_t previous, int32_t 
 #define CUP_MARKER   1
 #define CUP_FINALIST 2
 #define CUP_WINNER   4
+#define CUP_POINTS_SHIFT  3
+#define CUP_LIMIT_SHIFT   12
+#define CUP_WINNERS_SHIFT 21
+#define CUP_FIELD_MASK    511
 #define CUP_MAX_ROUNDS 256
 
 static const int kCupPoints[] = { 10, 6, 4, 3, 2, 1 };
@@ -692,30 +699,61 @@ static void CupResetFinishes(uint8_t* gs) {
     memset(g_cupFinishes, 0, sizeof(g_cupFinishes));
 }
 
-// The writer just finished their round. Returns 1 when they won the cup (the match is over).
+// The winners the cup has so far, its first winner, and the writers still able to win.
+static int CupWinners(uint8_t* gs, uint8_t** first, int* contenders) {
+    TArrayRaw* players = (TArrayRaw*)(gs + OFF_GS_PLAYERS);
+    int winners = 0;
+    *first = NULL;
+    *contenders = 0;
+    for (int32_t i = 0; i < players->Num; i++) {
+        uint8_t* p = ((uint8_t**)players->Data)[i];
+        if (!p) continue;
+        int score = CupScore(p);
+        if (!(score & CUP_MARKER)) continue;
+        if (score & CUP_WINNER) {
+            winners++;
+            if (((score >> CUP_POINTS_SHIFT) & CUP_FIELD_MASK) == 1) *first = p;
+        } else if (p[OFF_PS_WRITERSTATE] != WS_Dead && p[OFF_PS_WRITERSTATE] != WS_Executed) {
+            (*contenders)++;
+        }
+    }
+    return winners;
+}
+
+// The writer just finished their round. Returns 1 when the cup is over (the match ends).
 static int CupFinish(uint8_t* gs, uint8_t* ps) {
     if (g_cupGs != gs) CupResetFinishes(gs);
     int32_t round = *(int32_t*)(ps + OFF_PS_ROUND);
     if (round < 0 || round >= CUP_MAX_ROUNDS) return 0;
-    int rank = g_cupFinishes[round]++;
     int score = CupScore(ps);
     int id = *(int32_t*)(ps + OFF_PS_WRITERID);
+    if (score & CUP_WINNER) return 0;  // (a winner takes no place anymore)
+    int rank = g_cupFinishes[round]++;
     if (!(score & CUP_MARKER)) {
         Log("Cup: writer %d has no cup standing yet (rank %d not counted)", id, rank + 1);
         return 0;
     }
-    int limit = (score >> 13) & 1023, points = (score >> 3) & 1023;
+    int limit = (score >> CUP_LIMIT_SHIFT) & CUP_FIELD_MASK, points = (score >> CUP_POINTS_SHIFT) & CUP_FIELD_MASK;
     if (score & CUP_FINALIST) {
         if (rank != 0) return 0;
-        SetCupScore(ps, score | CUP_WINNER);
-        Log("Cup: finalist %d finished round %d first and wins the cup", id, round + 1);
-        ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, ps, 0);
+        int wanted = (score >> CUP_WINNERS_SHIFT) & 7;
+        uint8_t* first;
+        int contenders;
+        int place = CupWinners(gs, &first, &contenders) + 1;
+        SetCupScore(ps, (score & ~(CUP_FIELD_MASK << CUP_POINTS_SHIFT)) | CUP_WINNER | (place << CUP_POINTS_SHIFT));
+        contenders--;  // (this one is a winner now)
+        Log("Cup: finalist %d finished round %d first: winner %d of %d, %d writers left to win", id, round + 1, place,
+            wanted < 1 ? 1 : wanted, contenders);
+        if (place < wanted && contenders >= 2) return 0;
+        if (place == 1) first = ps;
+        Log("Cup: over, writer %d wins the match", *(int32_t*)(first + OFF_PS_WRITERID));
+        ((WinMatch_t)AT(RVA_WIN_MATCH))(gs, first, 0);
         return 1;
     }
     points += rank < (int)(sizeof(kCupPoints) / sizeof(kCupPoints[0])) ? kCupPoints[rank] : 0;
-    if (points > 1023) points = 1023;
+    if (points > CUP_FIELD_MASK) points = CUP_FIELD_MASK;
     int finalist = points >= limit ? CUP_FINALIST : 0;
-    SetCupScore(ps, (score & ~((1023 << 3) | CUP_FINALIST)) | (points << 3) | finalist);
+    SetCupScore(ps, (score & ~((CUP_FIELD_MASK << CUP_POINTS_SHIFT) | CUP_FINALIST)) | (points << CUP_POINTS_SHIFT) | finalist);
     Log("Cup: writer %d finished round %d at rank %d: %d/%d points%s", id, round + 1, rank + 1, points, limit,
         finalist ? ", finalist" : "");
     return 0;

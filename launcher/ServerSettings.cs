@@ -37,9 +37,11 @@ namespace Lanppart3Launcher
         [DataMember] public int MaxMistakesPerRound = 3;
         [DataMember] public int RoundDuration = 120;
         [DataMember] public int PauseDuration = 10;
-        // Lanppart Coupe (K.O. only): points per round, finalist at CupPoints, a finalist winning a round wins.
+        // Lanppart Coupe (K.O. only): points per round, finalist at CupPoints, a finalist winning a round is a
+        // winner; the cup ends with CupWinners winners.
         [DataMember] public bool Cup;
         [DataMember] public int CupPoints = 50;
+        [DataMember] public int CupWinners = 1;
         // A lobby preset (PresetStore) whose rules the server plays, or -1 for the rules above.
         [DataMember] public int Preset = -1;
 
@@ -54,14 +56,17 @@ namespace Lanppart3Launcher
             s.FillWithBots = p.FillWithBots; s.Bots = p.Bots; s.BotsDifficulty = p.BotsDifficulty;
             s.MistakeBehaviour = p.MistakeBehaviour; s.CapitalsMatter = p.CapitalsMatter;
             s.RoundDuration = p.RoundDuration; s.PauseDuration = p.PauseDuration;
-            s.Cup = p.Cup; s.CupPoints = p.CupPoints;
+            s.Cup = p.Cup; s.CupPoints = p.CupPoints; s.CupWinners = p.CupWinners;
             return s;
         }
 
         public bool IsCup => Cup && Mode == GameMode.Knockdown;
         // (Settings saved before the cup existed read 0.)
-        public int CupLimit => CupPoints >= 10 ? Math.Min(CupPoints, 999) : 50;
-        public string RulesText => IsCup ? "coupe à " + CupLimit + " pts" : Roulette ? "roulette" : Lives + " vies";
+        public int CupLimit => CupPoints >= 10 ? Math.Min(CupPoints, 500) : 50;
+        // (A K.O. has 8 players at most: 7 winners at most. Settings saved before this existed read 0: one winner.)
+        public int CupWinnerCount => CupWinners >= 1 ? Math.Min(CupWinners, 7) : 1;
+        public string RulesText => IsCup ? "coupe à " + CupLimit + " pts" + (CupWinnerCount > 1 ? ", " + CupWinnerCount + " vainqueurs" : "")
+                                 : Roulette ? "roulette" : Lives + " vies";
 
         public static int Capacity(GameMode mode) => mode == GameMode.BattleRoyale ? 40 : mode == GameMode.Knockdown ? 8 : 2;
 
@@ -108,7 +113,7 @@ namespace Lanppart3Launcher
             sb.AppendLine("    Bots = " + (FillWithBots ? "\"fill\"" : Bots.ToString(inv)) + ", BotsDifficulty = " + BotsDifficulty + ",");
             sb.AppendLine("    MistakeBehaviour = " + MistakeBehaviour + ", CapitalsMatter = " + (CapitalsMatter ? "true" : "false") + ",");
             sb.AppendLine("    RoundDuration = " + RoundDuration + ", PauseDuration = " + PauseDuration + ",");
-            if (IsCup) sb.AppendLine("    Cup = true, CupPoints = " + CupLimit + ",");
+            if (IsCup) sb.AppendLine("    Cup = true, CupPoints = " + CupLimit + ", CupWinners = " + CupWinnerCount + ",");
             sb.AppendLine("    TextIds = { " + string.Join(", ", gameTextIds) + " },");
             sb.AppendLine("    Texts = {");
             foreach (var t in customTexts)
@@ -164,6 +169,7 @@ namespace Lanppart3Launcher
             rules.Roulette = Regex.IsMatch(lua, @"\bRoulette = true");
             rules.Cup = Regex.IsMatch(lua, @"\bCup = true");
             rules.CupPoints = Int("CupPoints", rules.CupPoints);
+            rules.CupWinners = Int("CupWinners", 1);
             var ids = Regex.Match(lua, @"\bTextIds = \{([^}]*)\}");
             if (ids.Success)
                 foreach (Match id in Regex.Matches(ids.Groups[1].Value, @"\d+")) session.GameTextIds.Add(int.Parse(id.Value, CultureInfo.InvariantCulture));

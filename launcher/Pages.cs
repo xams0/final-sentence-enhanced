@@ -229,9 +229,14 @@ namespace Lanppart3Launcher
                 {
                     var points = o.Row("Points pour être finaliste", new Stepper(s.CupLimit, 10, 300, 10));
                     points.ValueChanged += v => { s.CupPoints = v; save(); };
+                    var winners = o.Row("Nombre de vainqueurs", new Stepper(s.CupWinnerCount, 1, 7),
+                                        "La coupe continue jusqu'à ce nombre de vainqueurs (1er, 2e, 3e...).");
+                    winners.ValueChanged += v => { s.CupWinners = v; save(); };
                     o.Note("Chaque manche, dans l'ordre d'arrivée : 10, 6, 4, 3, 2 et 1 points (le dernier, coupé comme en " +
                            "K.O., n'en marque pas). Un joueur qui atteint la limite devient finaliste ; un finaliste qui " +
-                           "termine ensuite une manche en premier remporte la coupe. Le texte continue de page en page.");
+                           "termine ensuite une manche en premier devient vainqueur. Les vainqueurs continuent d'écrire " +
+                           "sans prendre de place à l'arrivée ; la coupe s'arrête quand elle a tous ses vainqueurs (ou quand " +
+                           "il ne reste qu'un joueur pour gagner). Le texte continue de page en page.");
                 }
             }
             if (!s.IsCup) BuildRoulette(o, s, save, rebuild);  // (a cup has neither roulette nor lives)
@@ -371,7 +376,8 @@ namespace Lanppart3Launcher
                         var f = entry.Split(':');
                         if (f.Length < 3) continue;
                         rank++;
-                        var standing = f[2] == "W" ? "VAINQUEUR" : f[2] == "F" ? "finaliste" : f[1] + " pts";
+                        var standing = f[2] == "W" ? (rules.CupWinnerCount > 1 ? "VAINQUEUR " + (f[1] == "1" ? "1er" : f[1] + "e") : "VAINQUEUR")
+                                     : f[2] == "F" ? "finaliste" : f[1] + " pts";
                         side.Children.Add(Label("  " + rank + ". " + f[0] + " · " + standing, 16,
                                                 f[2] == "-" ? "CreamDim" : "Caption"));
                     }
@@ -756,7 +762,7 @@ namespace Lanppart3Launcher
                                 Plural(t.Layout.PageRoundCounts[0], "manche") + ") est jouée.", true));
             }
             if (rules.IsCup)
-                advice.Add(("En Coupe, la partie continue de page en page jusqu'à ce qu'un finaliste gagne une manche : la suite " +
+                advice.Add(("En Coupe, la partie continue de page en page jusqu'à ce que la coupe ait ses vainqueurs : la suite " +
                             "du texte, puis les autres textes de la rotation (ils reviennent si la coupe dure).", false));
             else if (rules.TurnsPages)
             {

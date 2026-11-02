@@ -44,8 +44,10 @@ Dans les deux cas, les règles sont libres :
 - Lanppart Coupe (K.O., comme la Coupe de Trackmania) : personne n'est éliminé. À chaque manche, l'ordre
   d'arrivée rapporte 10, 6, 4, 3, 2 puis 1 points (le dernier est coupé comme en K.O. et ne marque rien).
   Atteindre la limite de points (50 par défaut) rend finaliste ; un finaliste qui termine ensuite une
-  manche en premier remporte la coupe, et la partie s'arrête. Le classement est affiché à gauche de
-  l'écran ; le texte continue de page en page.
+  manche en premier devient vainqueur. Le nombre de vainqueurs se règle dans le launcher (1 par défaut,
+  jusqu'à 7) : les vainqueurs (1er, 2e...) continuent d'écrire sans prendre de place à l'arrivée, et la
+  partie s'arrête quand la coupe a tous ses vainqueurs. Le classement est affiché à gauche de l'écran ;
+  le texte continue de page en page.
 - Fil des événements, en haut à droite : qui perd une vie, qui est éliminé et pourquoi (dernier de la
   manche, temps écoulé, trop de fautes, roulette), qui survit à la roulette, qui gagne ; en Coupe, qui
   gagne la manche et qui devient finaliste. Il reste affiché 10 secondes après le dernier événement.

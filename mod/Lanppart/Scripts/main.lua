@@ -46,6 +46,7 @@ if not isServer then
 end
 
 local installed = false
+local animSerial = false
 local catalogDone = false
 local joinDone = launchOrders.join == nil
 local lastGiState = nil
@@ -56,6 +57,14 @@ local function OnGameThreadTick()
     if not installed then
         installed = Native.Install()
         Native.DisableIris()
+    end
+    -- Animations on the game thread: on the task graph workers, UAnimSequence pose evaluation crashed 3 times
+    -- the same way (stack off by 8 after IsValidAdditive, then a fail-fast), mostly in K.O. with lives.
+    if not animSerial then
+        Host.Console("a.ParallelAnimEvaluation 0")
+        Host.Console("a.ParallelAnimUpdate 0")
+        animSerial = true
+        print("[Lanppart] animations on the game thread\n")
     end
     -- Official servers use generic replication: leave Iris on only while in a Lanppart session.
     if gi.State == GI_STATE_MAINMENU and lastGiState ~= GI_STATE_MAINMENU then
